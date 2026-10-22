@@ -1,0 +1,400 @@
+
+/* ==================================================
+   LLU 27 – UNIFIED NAVIGATION
+   Desktop: schmale Sidebar (210px)
+   Mobile: ausklappbares Menü
+   ================================================== */
+
+body.llu-layout {
+    --llu-side-width: 210px;
+}
+
+/* Alte obere Navigation ausblenden */
+.llu-layout .top {
+    display: none !important;
+}
+
+/* ==================================================
+   SIDEBAR – DESKTOP
+   ================================================== */
+
+.llu-sidebar {
+    position: fixed;
+    z-index: 1001;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--llu-side-width);
+    background: #121e2c;
+    border-right: 1px solid #304154;
+    display: flex;
+    flex-direction: column;
+    padding: 22px 11px 17px;
+    color: #f0f5f9;
+    overflow-y: auto;
+}
+
+/* LLU 27 Branding */
+.llu-sidebar-brand {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    padding: 4px 6px 21px;
+    text-decoration: none;
+    color: #fff;
+    border-bottom: 1px solid #304154;
+}
+
+.llu-sidebar-brand img {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    object-fit: cover;
+    flex: none;
+}
+
+.llu-sidebar-brand strong {
+    display: block;
+    font-size: 17px;
+    line-height: 1.2;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.llu-sidebar-brand b {
+    color: #fc4c02;
+}
+
+.llu-sidebar-brand small {
+    display: block;
+    color: #9dadbd;
+    font-size: 8px;
+    letter-spacing: 0.7px;
+    white-space: nowrap;
+    margin-top: 4px;
+}
+
+/* Menüabschnitte */
+.llu-sidebar-section {
+    color: #7f96ab;
+    font-size: 10px;
+    letter-spacing: 1.7px;
+    font-weight: 800;
+    margin: 24px 10px 10px;
+}
+
+/* Navigationspunkte */
+.llu-sidebar-nav {
+    display: grid;
+    gap: 6px;
+}
+
+.llu-nav-link {
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    text-decoration: none;
+    padding: 11px 10px;
+    color: #c5d2de;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    transition: background .15s, color .15s;
+}
+
+.llu-nav-link:hover,
+.llu-nav-link:focus-visible {
+    color: white;
+    background: #28394b;
+}
+
+.llu-nav-link.is-current {
+    color: #fff;
+    background: #354051;
+    border: 1px solid rgba(252, 76, 2, .6);
+}
+
+.llu-nav-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    color: #ff8656;
+    font-size: 19px;
+}
+
+/* ==================================================
+   SIDEBAR UNTEN
+   ================================================== */
+
+.llu-sidebar-bottom {
+    margin-top: auto;
+    padding: 20px 7px 0;
+    border-top: 1px solid #304154;
+    display: grid;
+    gap: 12px;
+}
+
+.llu-user-label {
+    color: #9dadbd;
+    font-size: 11px;
+}
+
+.llu-user-label strong {
+    display: block;
+    color: #f0f5f9;
+    font-size: 13px;
+}
+
+.llu-signout {
+    width: 100%;
+    color: #d9e5f0;
+    background: #1d2e3f;
+    border: 1px solid #40566a;
+    border-radius: 9px;
+    text-align: center;
+}
+
+.llu-signout:hover {
+    background: #293d50;
+}
+
+.llu-sidebar-motto {
+    color: #ff875d;
+    font-size: 9px;
+    letter-spacing: .8px;
+    font-weight: 800;
+}
+
+/* ==================================================
+   HAUPTINHALT
+   ================================================== */
+
+.llu-layout .shell {
+    max-width: 1400px;
+    margin-left: var(--llu-side-width);
+    padding: 24px clamp(15px, 2.4vw, 35px);
+    min-width: 0;
+}
+
+.llu-menu-button,
+.llu-menu-backdrop {
+    display: none;
+}
+
+.llu-layout .shell .hero {
+    margin-top: 8px;
+}
+
+.llu-layout .profile-wrap {
+    margin-top: 20px;
+}
+
+/* ==================================================
+   MOBILE NAVIGATION
+   ================================================== */
+
+@media (max-width: 900px) {
+
+    .llu-layout .shell {
+        margin-left: 0;
+        padding: 78px 14px 22px;
+        max-width: none;
+        width: 100%;
+    }
+
+    .llu-menu-button {
+        display: flex;
+        position: fixed;
+        z-index: 1003;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 59px;
+        align-items: center;
+        gap: 12px;
+        background: #121e2c;
+        color: white;
+        border: 0;
+        border-bottom: 1px solid #344457;
+        border-radius: 0;
+        padding: 0 17px;
+        box-shadow: 0 5px 18px #080e1680;
+        font-size: 15px;
+        letter-spacing: .8px;
+    }
+
+    .llu-menu-button > span:first-child {
+        font-size: 22px;
+        color: #fc4c02;
+    }
+
+    .llu-menu-button-label {
+        margin-left: auto;
+        color: #a8b9c9;
+        font-size: 12px;
+    }
+
+    .llu-sidebar {
+        width: min(280px, 85vw);
+        transform: translateX(-105%);
+        transition: transform .22s ease;
+        box-shadow: 8px 0 25px #0005;
+    }
+
+    .llu-layout.llu-nav-open .llu-sidebar {
+        transform: translateX(0);
+    }
+
+    .llu-layout.llu-nav-open .llu-menu-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background: rgba(1, 7, 14, .74);
+        z-index: 1000;
+    }
+
+    .llu-layout.llu-nav-open .llu-menu-button {
+        left: min(280px, 85vw);
+        right: 0;
+        width: auto;
+        justify-content: center;
+        padding: 0 8px;
+    }
+
+    .llu-layout.llu-nav-open .llu-menu-button-label {
+        display: none;
+    }
+
+    .llu-layout.llu-nav-open {
+        overflow: hidden;
+    }
+
+    .llu-layout .stats,
+    .llu-layout .charts,
+    .llu-layout .perf-panels {
+        min-width: 0;
+    }
+
+    .llu-layout .panel,
+    .llu-layout .stat {
+        min-width: 0;
+    }
+
+    .llu-layout .canvas {
+        max-width: 100%;
+    }
+}
+
+/* ==================================================
+   KLEINE SMARTPHONES
+   ================================================== */
+
+@media (max-width: 480px) {
+
+    .llu-layout .stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .llu-layout .stat,
+    .llu-layout .panel {
+        padding: 14px;
+    }
+
+    .llu-layout .hero,
+    .llu-layout .llu-hero {
+        padding: 18px;
+        min-width: 0;
+    }
+
+    .llu-layout .profile-wrap {
+        margin: 10px auto;
+    }
+
+    .llu-layout .perf-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .llu-layout .team-head {
+        gap: 12px;
+    }
+}
+
+/* ============================================
+   LLU 27 – Desktop Sidebar Toggle
+   ============================================ */
+
+@media (min-width: 901px) {
+
+    /* Sidebar animieren */
+    .llu-sidebar {
+        width: 210px;
+        transition:
+            transform 0.25s ease,
+            opacity 0.25s ease;
+    }
+
+    /* Hauptinhalt animieren */
+    .llu-layout .shell {
+        margin-left: 210px;
+        transition: margin-left 0.25s ease;
+    }
+
+    /* Desktop-Menübutton */
+    .llu-desktop-toggle {
+        position: fixed;
+        top: 20px;
+        left: 222px;
+        z-index: 1100;
+
+        width: 38px;
+        height: 38px;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        background: #1d2e3f;
+        border: 1px solid #40566a;
+        border-radius: 10px;
+
+        color: #fc4c02;
+        font-size: 21px;
+        cursor: pointer;
+
+        transition:
+            left 0.25s ease,
+            background 0.2s ease;
+    }
+
+    .llu-desktop-toggle:hover {
+        background: #30465c;
+    }
+
+    /* Eingeklappte Sidebar */
+    body.llu-sidebar-collapsed .llu-sidebar {
+        transform: translateX(-100%);
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Inhalt nutzt volle Breite */
+    body.llu-sidebar-collapsed .shell {
+        margin-left: 0;
+        padding-top: 70px;
+    }
+
+    /* Toggle wandert nach links */
+    body.llu-sidebar-collapsed .llu-desktop-toggle {
+        left: 15px;
+    }
+}
+
+/* Mobil: vorhandenes Hamburger-Menü nutzen */
+@media (max-width: 900px) {
+    .llu-desktop-toggle {
+        display: none !important;
+    }
+}
+

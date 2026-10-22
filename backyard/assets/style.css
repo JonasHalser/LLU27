@@ -1,0 +1,126 @@
+:root {
+  color-scheme: dark;
+  --bg: #0d1420;
+  --panel: #1a2635;
+  --edge: #2c3948;
+  --txt: #f0f5f9;
+  --muted: #9dadbd;
+  --orange: #fc4c02;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--txt); font: 15px/1.55 system-ui,-apple-system,Segoe UI,sans-serif; }
+a { color: inherit; }
+.shell { max-width: 1250px; margin: auto; padding: 24px; }
+.top { display: flex; justify-content: space-between; align-items: center; padding: 6px 0 22px; border-bottom: 1px solid var(--edge); }
+.top form { display: flex; align-items: center; gap: 18px; }
+.brand { font-size: 19px; letter-spacing: 1.5px; font-weight: 900; display:flex; align-items:center; gap:9px; text-decoration:none; }
+.brand em { font-style: normal; color: var(--orange); }
+.mark { display: inline-grid; place-items: center; background: var(--orange); padding: 0 9px; border-radius: 8px; color: white; font-size: 25px; margin-right: 7px; }
+.brand-logo { width: 46px; height: 46px; object-fit: contain; display:block; border-radius: 10px; }
+.brand-caption { font-size: 12px; letter-spacing: 1px; color: #aab6c6; vertical-align: middle; }
+.hero { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 34px 0 24px; }
+.hero h1 { font-size: clamp(25px,4vw,44px); margin: 5px 0; }
+.hero h1 span { color: var(--orange); }
+.eyebrow { color: var(--orange); font-size: 11px; letter-spacing: 2.1px; font-weight: 700; }
+.muted,.note { color: var(--muted); }
+.pill { border-radius: 35px; background: #18392f; color: #8be4bc; padding: 10px 16px; white-space: nowrap; font-size: 12px; }
+.settings { display: flex; align-items: end; justify-content: space-between; gap: 15px; flex-wrap: wrap; margin: 10px 0 22px; }
+.dateform { display: flex; gap: 10px; align-items: end; }
+.dateform label { color: var(--muted); font-size: 12px; }
+.dateform input { display: block; margin-top: 4px; }
+.tiny { font-size: 11px; }
+button,.btn { cursor: pointer; border: 0; border-radius: 9px; font: 600 13px system-ui; padding: 11px 17px; }
+.btn { display: inline-block; color: white; background: var(--orange); text-decoration: none; }
+.outline { border: 1px solid #455466; background: transparent; color: var(--txt); }
+.danger { color: #ff918a; }
+input { color: white; background: #101c29; border: 1px solid #435266; border-radius: 8px; padding: 11px; font: inherit; }
+label { display: block; }
+.stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; }
+.stat,.panel { border: 1px solid var(--edge); border-radius: 15px; background: var(--panel); padding: 22px; }
+.stat span { font-size: 11px; letter-spacing: 1px; color: var(--muted); }
+.stat strong { display: block; font-size: clamp(26px,3vw,38px); line-height: 1.3; margin-top: 7px; }
+.stat small { font-size: 16px; color: #b7c4d2; }
+.stat p { color: var(--muted); font-size: 12px; margin: 5px 0 0; }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+.panel h2 { margin: 0; font-size: 18px; }
+.panel .muted { font-size: 12px; margin: 4px 0 15px; }
+.canvas { height: 260px; }
+.wide { grid-column: 1/-1; }
+.wide .canvas { height: 290px; }
+.tablewrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 12px; }
+th { text-align: left; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--edge); }
+td,th { padding: 11px 13px; white-space: nowrap; }
+td { border-bottom: 1px solid #273342; }
+.foot { margin: 20px 0; }
+.login { max-width: 440px; margin: 13vh auto; padding: 22px; }
+.login .brand { text-align: center; justify-content:center; margin-bottom: 30px; }
+.login h1 { font-size: 32px; margin: 0; }
+.login form { display: grid; gap: 15px; margin-top: 25px; }
+.login input { display: block; width: 100%; margin-top: 5px; }
+.login .note { text-align: center; font-size: 12px; }
+.intro { margin: 20px 0; }
+.error { padding: 12px; background: #59272e; color: #ffe0e0; border-radius: 8px; }
+.notice { padding: 12px; background: #143b2c; color: #acf2cc; border-radius: 8px; }
+
+/* LLU 27 – Hero */
+.llu-hero { position: relative; overflow: hidden; isolation: isolate; background: radial-gradient(ellipse at 91% 24%,rgba(252,76,2,.18),transparent 38%),linear-gradient(120deg,#182637 0%,#101c2b 60%,#172437 100%); border: 1px solid #354355; border-radius: 22px; padding: clamp(24px,4vw,48px); margin: 24px 0 25px; min-height: 290px; box-shadow: 0 15px 45px rgba(0,0,0,.16); }
+.llu-hero::after { content: ""; position: absolute; right: -95px; bottom: -175px; width: 410px; height: 410px; border: 38px solid rgba(252,76,2,.11); border-radius: 50%; z-index: -1; pointer-events: none; }
+.llu-hero .hero-copy { position: relative; z-index: 1; }
+.llu-hero h1 { font-size: clamp(32px,5.2vw,67px); line-height: 1.07; font-weight: 900; letter-spacing: -.035em; margin: 15px 0 16px; }
+.llu-hero h1 span { color: #fc4c02; }
+.llu-hero .eyebrow { display: flex; align-items: center; gap: 9px; color: #ff7949; font-size: 11px; font-weight: 800; letter-spacing: 1.65px; margin: 0; }
+.eyebrow-dot { height: 7px; width: 7px; background: #fc4c02; border-radius: 50%; box-shadow: 0 0 0 4px rgba(252,76,2,.12); flex-shrink:0; }
+.llu-hero .hero-subtitle { font-size: clamp(13px,1.5vw,17px); color: #bdcbd8; margin: 0 0 21px; }
+.runner-tags { display: flex; flex-wrap: wrap; align-items:center; gap: 10px; margin-top: 20px; }
+.runner-tags span { display: inline-flex; align-items:center; justify-content:center; background: #293a4d; border: 1px solid #45566a; color: #eef4fb; padding: 7px 16px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: 1.3px; }
+.hero-footer { border-top: 1px solid #354558; max-width: 410px; padding-top: 15px; margin: 23px 0 0; color: #ff875d; font-size: 11px; font-weight: 800; letter-spacing: 2px; }
+.llu-hero .pill { align-self: flex-start; position: relative; z-index: 2; background: #1b3b30; border: 1px solid #2c614c; }
+
+/* Team-Kilometervergleich */
+.team-board { margin: 18px 0 22px; background: linear-gradient(140deg,#1b2a3b,#182433); }
+.team-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 22px; flex-wrap: wrap; }
+.team-head .eyebrow { margin: 0 0 5px; }
+.team-head h2 { font-size: clamp(19px,2.8vw,27px); }
+.team-total { border: 1px solid #425267; background: #0f1b2a; border-radius: 14px; padding: 10px 20px; text-align: right; }
+.team-total span { display: block; font-size: 10px; letter-spacing: 1.5px; color: #9dadbd; }
+.team-total strong { font-size: 26px; color: #fc4c02; }
+.team-list { display: grid; gap: 22px; }
+.team-entry { --person: #fc4c02; }
+.team-jonas { --person: #2dd4bf; }
+.team-noah { --person: #a5a0ff; }
+.team-row,.team-meta { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.team-row { margin-bottom: 10px; }
+.team-name { font-size: 15px; font-weight: 850; text-transform: uppercase; letter-spacing: 1px; }
+.team-row strong { font-size: 20px; }
+.team-bar-bg { display: block; width: 100%; height: 14px; border-radius: 999px; background: #344457; overflow: hidden; }
+.team-bar { display: block; height: 100%; min-width: 0; border-radius: 999px; background: var(--person,#fc4c02); transition: width .4s ease; }
+.team-meta { font-size: 11px; color: #aebdcc; margin-top: 7px; flex-wrap: wrap; }
+.team-disclaimer { font-size: 11px; line-height: 1.5; color: #9dadbd; border-top: 1px solid #314154; padding-top: 12px; margin: 20px 0 0; }
+
+@media(max-width:850px) {
+  .stats { grid-template-columns: repeat(2,1fr); }
+  .charts { grid-template-columns: 1fr; }
+  .wide { grid-column: 1; }
+  .hero { align-items: flex-start; flex-direction: column; }
+  .shell { padding: 15px; }
+  .llu-hero { padding: 24px; min-height: 0; }
+  .llu-hero .pill { margin-top: 7px; }
+  .brand-caption { display: none; }
+}
+@media(max-width:520px) {
+  .team-total { text-align: left; }
+  .team-row strong { font-size: 17px; }
+}
+@media(max-width:450px) {
+  .stats { gap: 9px; }
+  .stat,.panel { padding: 15px; }
+  .stat strong { font-size: 26px; }
+  .username { display: none; }
+  .dateform { flex-wrap: wrap; }
+  .llu-hero h1 { font-size: clamp(28px,9vw,40px); }
+  .llu-hero .eyebrow { font-size: 10px; letter-spacing: 1px; }
+  .llu-hero .hero-subtitle { font-size: 14px; }
+}
+
+.brand-icon{display:block;width:56px;height:56px;object-fit:cover;border-radius:14px;vertical-align:middle;margin-right:9px}.brand{display:flex;align-items:center;gap:8px}.team-charts .canvas{height:320px}

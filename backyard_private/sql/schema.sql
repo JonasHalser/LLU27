@@ -1,0 +1,34 @@
+CREATE TABLE IF NOT EXISTS users (
+ id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ username VARCHAR(40) NOT NULL UNIQUE,
+ display_name VARCHAR(80) NOT NULL,
+ password_hash VARCHAR(255) NOT NULL,
+ start_date DATE NOT NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS athletes (
+ user_id INT UNSIGNED PRIMARY KEY,
+ athlete_id BIGINT UNSIGNED NOT NULL UNIQUE,
+ access_token TEXT NOT NULL,
+ refresh_token TEXT NOT NULL,
+ expires_at BIGINT NOT NULL,
+ last_sync DATETIME NULL,
+ last_full_sync DATETIME NULL,
+ sync_error VARCHAR(255) NULL,
+ FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS activities (
+ id BIGINT UNSIGNED PRIMARY KEY,
+ user_id INT UNSIGNED NOT NULL,
+ name VARCHAR(255) NOT NULL,
+ activity_date DATETIME NOT NULL,
+ distance_m DOUBLE NOT NULL,
+ moving_seconds INT NOT NULL,
+ elevation_m DOUBLE NOT NULL,
+ avg_hr DOUBLE NULL,
+ max_hr DOUBLE NULL,
+ cache_updated_at DATETIME NOT NULL,
+ INDEX idx_user_date (user_id,activity_date),
+ INDEX idx_cache (cache_updated_at),
+ FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
