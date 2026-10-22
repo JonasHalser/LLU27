@@ -1,0 +1,25 @@
+
+# LLU27 – Geheimnisse
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Laufzeitdateien
+*.lock
+*.log
+error_log
+sessions/
+cache/
+tmp/
+
+# Backups
+*.bak
+*.backup
+*.sql.gz
+*.zip
+
+# Systemdateien
+.DS_Store
+Thumbs.db
