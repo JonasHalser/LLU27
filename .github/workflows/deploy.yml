@@ -1,0 +1,151 @@
+
+name: LLU27 Deploy to Hostinger
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Nur testen, nichts übertragen"
+        type: boolean
+        default: true
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llu27-hostinger-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: PHP-Syntax prüfen
+        run: |
+          set -euo pipefail
+          find backyard backyard_private/app backyard_private/bin \
+            -type f -name '*.php' -print0 |
+          while IFS= read -r -d '' file; do
+            php -l "$file"
+          done
+
+      - name: Deployment-Dateien vorbereiten
+        run: |
+          set -euo pipefail
+
+          test -d backyard
+          test -d backyard_private/app
+          test -d backyard_private/bin
+
+          mkdir -p "$RUNNER_TEMP/llu27-web"
+          mkdir -p "$RUNNER_TEMP/llu27-private/app"
+          mkdir -p "$RUNNER_TEMP/llu27-private/bin"
+
+          rsync -a \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='*.lock' \
+            --exclude='*.log' \
+            --exclude='error_log' \
+            --exclude='*.bak' \
+            --exclude='*.backup' \
+            backyard/ "$RUNNER_TEMP/llu27-web/"
+
+          rsync -a \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='*.lock' \
+            --exclude='*.log' \
+            --exclude='error_log' \
+            --exclude='*.bak' \
+            --exclude='*.backup' \
+            backyard_private/app/ \
+            "$RUNNER_TEMP/llu27-private/app/"
+
+          rsync -a \
+            --exclude='*.lock' \
+            --exclude='*.log' \
+            --exclude='error_log' \
+            backyard_private/bin/ \
+            "$RUNNER_TEMP/llu27-private/bin/"
+
+      - name: SSH vorbereiten
+        env:
+          DEPLOY_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_KEY"
+          test -n "$KNOWN_HOSTS"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Zu Hostinger verbinden
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_USER }}
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/id_ed25519 \
+            -p "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            'test -d domains/zjung-partyband.de/public_html/backyard &&
+             test -d domains/zjung-partyband.de/backyard_private/app &&
+             test -d domains/zjung-partyband.de/backyard_private/bin &&
+             command -v rsync'
+
+      - name: Dateien übertragen
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_USER }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          RSYNC_OPTIONS=(-av --itemize-changes)
+
+          if [ "$DRY_RUN" = "true" ]; then
+            RSYNC_OPTIONS+=(--dry-run)
+            echo "TESTMODUS: Es werden keine Dateien übertragen."
+          else
+            echo "LIVE-DEPLOYMENT gestartet."
+          fi
+
+          SSH_COMMAND="ssh -i $HOME/.ssh/id_ed25519 -p $SSH_PORT -o BatchMode=yes -o StrictHostKeyChecking=yes"
+
+          BASE="/home/u489447694/domains/zjung-partyband.de"
+
+          rsync "${RSYNC_OPTIONS[@]}" \
+            -e "$SSH_COMMAND" \
+            "$RUNNER_TEMP/llu27-web/" \
+            "$SSH_USER@$SSH_HOST:$BASE/public_html/backyard/"
+
+          rsync "${RSYNC_OPTIONS[@]}" \
+            -e "$SSH_COMMAND" \
+            "$RUNNER_TEMP/llu27-private/app/" \
+            "$SSH_USER@$SSH_HOST:$BASE/backyard_private/app/"
+
+          rsync "${RSYNC_OPTIONS[@]}" \
+            -e "$SSH_COMMAND" \
+            "$RUNNER_TEMP/llu27-private/bin/" \
+            "$SSH_USER@$SSH_HOST:$BASE/backyard_private/bin/"
+
+          echo "Deployment-Schritt abgeschlossen."
