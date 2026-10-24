@@ -89,4 +89,6 @@ Vorgeschlagener Commit: `feat: add secure supporter zone with cheers, weekly pre
 
 ## Lokales Prüfergebnis (24.10.2026)
 
+Korrektur nach dem ersten CI-Lauf: Der HTTP-Integrationstest bildet jetzt die Hostinger-Struktur `public_html/backyard/` neben `backyard_private/` in einem temporären Verzeichnis ab. Die öffentliche Basis-URL enthält auch im Test `/backyard`. Falsche Include-Tiefen in den beiden Supporter-Partials wurden berichtigt. Verbindungsfehler und HTTP 500 geben im Test das PHP-Serverlog aus; die Profilseite einschließlich Push-Partial wird zusätzlich geprüft. Ein erneuter CI-Lauf ist zur Bestätigung erforderlich.
+
 Repository und Änderungen wurden statisch geprüft; git diff --check meldet keine Whitespace-Fehler. JSON-Manifeste und Composer-Konfiguration werden lokal mit PowerShell geparst. PHP und Composer sind nicht vorinstalliert. Eine offizielle PHP-8.3-Testlaufzeit wurde nach SHA256-Prüfung temporär geladen, ihre Ausführung jedoch vom Windows-Anwendungsschutz blockiert. Daher sind weder PHP-Lint noch Regel-/Integrationstests lokal ausgeführt; auch der neue CI-Workflow wurde nicht gestartet. MySQL, VAPID und echte Browsergeräte fehlen. Vor Freigabe müssen CI und Staging-Abnahme erfolgreich abgeschlossen werden. Kein Deployment, keine produktiven Datenänderungen.

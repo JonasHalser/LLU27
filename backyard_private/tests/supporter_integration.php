@@ -4,7 +4,7 @@ declare(strict_types=1);
 if(PHP_SAPI!=='cli'||getenv('GITHUB_ACTIONS')!=='true') exit("Only available in disposable CI environment.\n");
 $private=dirname(__DIR__); $env=$private.'/.env';
 if(is_file($env)) throw new RuntimeException('Refusing to overwrite an existing configuration.');
-file_put_contents($env,"DB_HOST=127.0.0.1\nDB_NAME=llu27_test\nDB_USER=root\nDB_PASS=test-only-password\nAPP_URL=http://127.0.0.1:8765\nTOKEN_KEY=".base64_encode(random_bytes(32))."\n");
+file_put_contents($env,"DB_HOST=127.0.0.1\nDB_NAME=llu27_test\nDB_USER=root\nDB_PASS=test-only-password\nAPP_URL=http://127.0.0.1:8765/backyard\nTOKEN_KEY=".base64_encode(random_bytes(32))."\n");
 register_shutdown_function(static function()use($env){unlink($env);});
 require_once $private.'/app/supporter.php';
 $p=db(); if($p->query('SELECT DATABASE()')->fetchColumn()!=='llu27_test') throw new RuntimeException('Unsafe database.');
@@ -32,20 +32,40 @@ $p->prepare('INSERT INTO supporter_tips(supporter_id,iso_year,iso_week,runner_id
 test((int)$p->query('SELECT COUNT(*) FROM supporter_tips')->fetchColumn()===1,'one prediction per week');
 supporterLimit('test',1,30);
 try {supporterLimit('test',1,30);test(false,'rate limit');}catch(RuntimeException $e){test(true,'rate limit');}
-$process=proc_open([PHP_BINARY,'-S','127.0.0.1:8765','-t',dirname($private).'/backyard'],[['pipe','r'],['file',sys_get_temp_dir().'/llu27-http.log','a'],['file',sys_get_temp_dir().'/llu27-http.log','a']],$pipes);
+// Match Hostinger: public_html/backyard and backyard_private are siblings.
+// Serving the repository's backyard directory directly breaks the production
+// dirname(__DIR__, N) includes. Copy public files: symlinking them would cause
+// PHP's __DIR__ to resolve back to the incompatible repository layout.
+$fixture=sys_get_temp_dir().'/llu27-http-'.bin2hex(random_bytes(8));
+$documentRoot=$fixture.'/public_html'; $web=$documentRoot.'/backyard';
+mkdir($web,0700,true);
+if(!symlink($private,$fixture.'/backyard_private')) throw new RuntimeException('Cannot link private test application.');
+$source=dirname($private).'/backyard';
+$iterator=new RecursiveIteratorIterator(new RecursiveDirectoryIterator($source,FilesystemIterator::SKIP_DOTS),RecursiveIteratorIterator::SELF_FIRST);
+foreach($iterator as $item) {
+    $destination=$web.'/'.substr($item->getPathname(),strlen($source)+1);
+    if($item->isDir()) mkdir($destination,0700,true);
+    elseif(!copy($item->getPathname(),$destination)) throw new RuntimeException('Cannot copy public test file.');
+}
+$serverLog=$fixture.'/http.log';
+$process=proc_open([PHP_BINARY,'-S','127.0.0.1:8765','-t',$documentRoot],[['pipe','r'],['file',$serverLog,'a'],['file',$serverLog,'a']],$pipes);
 if(!is_resource($process)) throw new RuntimeException('HTTP server failed.');
 register_shutdown_function(static function()use($process){proc_terminate($process);proc_close($process);});
 $cookies=[];
 function request(string $path,?array $data=null,string $jar='supporter'): array {
-    global $cookies; $ch=curl_init('http://127.0.0.1:8765/'.$path); $headers=[];
+    global $cookies,$serverLog; $ch=curl_init('http://127.0.0.1:8765/backyard/'.$path); $headers=[];
     // Secure cookies cannot travel over HTTP; replay only in this local harness to test sessions.
     $cookie=implode('; ',array_map(static fn($k,$v)=>$k.'='.$v,array_keys($cookies[$jar]??[]),array_values($cookies[$jar]??[])));
-    curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_COOKIE=>$cookie,CURLOPT_HEADERFUNCTION=>static function($ch,$line)use(&$headers,$jar){global $cookies;$headers[]=$line;if(preg_match('/^Set-Cookie:\s*([^=]+)=([^;]*)/i',$line,$m))$cookies[$jar][$m[1]]=$m[2];return strlen($line);}]);
+    curl_setopt_array($ch,[CURLOPT_RETURNTRANSFER=>true,CURLOPT_FOLLOWLOCATION=>false,CURLOPT_CONNECTTIMEOUT=>3,CURLOPT_TIMEOUT=>15,CURLOPT_COOKIE=>$cookie,CURLOPT_HEADERFUNCTION=>static function($ch,$line)use(&$headers,$jar){global $cookies;$headers[]=$line;if(preg_match('/^Set-Cookie:\s*([^=]+)=([^;]*)/i',$line,$m))$cookies[$jar][$m[1]]=$m[2];return strlen($line);}]);
     if($data!==null) {curl_setopt($ch,CURLOPT_POST,true);curl_setopt($ch,CURLOPT_POSTFIELDS,http_build_query($data));}
-    $body=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_HTTP_CODE);curl_close($ch);return [$status,(string)$body,$headers];
+    $body=curl_exec($ch);$status=curl_getinfo($ch,CURLINFO_HTTP_CODE);$error=curl_error($ch);curl_close($ch);
+    if($body===false || $status>=500) throw new RuntimeException('HTTP request failed: '.$path.' status='.$status.' curl='.$error."\n".(is_file($serverLog)?file_get_contents($serverLog):'No server log available.'));
+    return [$status,(string)$body,$headers];
 }
 function token(string $body): string { if(!preg_match('/name="csrf" value="([a-f0-9]+)"/',$body,$m))throw new RuntimeException('CSRF missing');return $m[1]; }
-for($i=0;$i<30;$i++){ $socket=@fsockopen('127.0.0.1',8765);if($socket){fclose($socket);break;}usleep(100000); }
+$ready=false;
+for($i=0;$i<30;$i++){ $socket=@fsockopen('127.0.0.1',8765);if($socket){fclose($socket);$ready=true;break;}usleep(100000); }
+if(!$ready) throw new RuntimeException('HTTP server did not start: '.(is_file($serverLog)?file_get_contents($serverLog):'No server log available.'));
 [$status,$body]=request('supporter/register.php');test($status===200,'registration form');$csrf=token($body);
 [$status]=request('supporter/register.php',['csrf'=>$csrf,'username'=>'new_support','display_name'=>'New','password'=>'new-password-123','confirm'=>'new-password-123']);test($status===302,'registration succeeds');
 [$status,$body]=request('supporter/register.php',['csrf'=>$csrf,'username'=>'new_support','password'=>'new-password-123','confirm'=>'new-password-123']);test($status===200&&str_contains($body,'bereits vergeben'),'duplicate registration');
@@ -56,6 +76,7 @@ $old=$cookies['supporter']['llu27_supporter_session'];
 test($old!==$cookies['supporter']['llu27_supporter_session'],'session rotation');
 test(isset($cookies['supporter']['llu27_supporter_remember']),'remember issued');
 [$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Anfeuern'),'authenticated dashboard');
+[$status,$body]=request('supporter/profile.php');test($status===200&&str_contains($body,'Push-Benachrichtigungen'),'supporter profile and push partial');
 [$status]=request('dashboard.php');test($status===302,'supporter denied runner dashboard');
 [$status,$body]=request('index.php'); $runnerCsrf=token($body);
 [$status]=request('index.php',['csrf'=>$runnerCsrf,'username'=>'tim','password'=>'runner-password']);test($status===302,'runner login while supporter logged in');

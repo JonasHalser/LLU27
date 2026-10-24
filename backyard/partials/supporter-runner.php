@@ -1,7 +1,7 @@
 <?php
 // Optional module: a pending supporter migration must never break the runner dashboard.
-require_once dirname(__DIR__,2).'/backyard_private/app/supporter.php';
-require_once dirname(__DIR__,2).'/backyard_private/app/push.php';
+require_once dirname(__DIR__,3).'/backyard_private/app/supporter.php';
+require_once dirname(__DIR__,3).'/backyard_private/app/push.php';
 $supporterError=''; $supporterMessages=[]; $supporterReady=false; $sharing=false;
 $adminIds=array_filter(array_map('intval',explode(',',cfg('SUPPORTER_ADMIN_RUNNER_IDS'))));
 $supporterAdmin=in_array((int)$u['id'],$adminIds,true);
