@@ -8,6 +8,7 @@ if (PHP_SAPI !== 'cli') {
 
 require_once dirname(__DIR__) . '/app/sync.php';
 require_once dirname(__DIR__) . '/app/performance_sync.php';
+require_once dirname(__DIR__) . '/app/weekly_goals.php';
 
 $lock = fopen(dirname(__DIR__) . '/sync.lock', 'c');
 
@@ -18,6 +19,14 @@ if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
 try {
     foreach (runSync() as $line) {
         echo $line . "\n";
+    }
+
+    try {
+        weeklyGoalRefreshCurrentAndPrevious();
+        echo "Wochenziele aktualisiert\n";
+    } catch (PDOException $e) {
+        // Training sync remains available until the optional migration is installed.
+        echo "Wochenziele noch nicht eingerichtet\n";
     }
 
     foreach (ll27SyncPerformance() as $line) {

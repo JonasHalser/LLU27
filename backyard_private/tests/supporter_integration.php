@@ -7,6 +7,7 @@ if(is_file($env)) throw new RuntimeException('Refusing to overwrite an existing 
 file_put_contents($env,"DB_HOST=127.0.0.1\nDB_NAME=llu27_test\nDB_USER=root\nDB_PASS=test-only-password\nAPP_URL=http://127.0.0.1:8765/backyard\nTOKEN_KEY=".base64_encode(random_bytes(32))."\n");
 register_shutdown_function(static function()use($env){unlink($env);});
 require_once $private.'/app/supporter.php';
+require_once $private.'/app/weekly_goals.php';
 $p=db(); if($p->query('SELECT DATABASE()')->fetchColumn()!=='llu27_test') throw new RuntimeException('Unsafe database.');
 $checks=0;
 function test(bool $ok,string $label): void {global $checks; if(!$ok) throw new RuntimeException('FAIL: '.$label); $checks++;}
@@ -80,7 +81,22 @@ test(isset($cookies['supporter']['llu27_supporter_remember']),'remember issued')
 [$status]=request('dashboard.php');test($status===302,'supporter denied runner dashboard');
 [$status,$body]=request('index.php'); $runnerCsrf=token($body);
 [$status]=request('index.php',['csrf'=>$runnerCsrf,'username'=>'tim','password'=>'runner-password']);test($status===302,'runner login while supporter logged in');
-[$status]=request('dashboard.php');test($status===200,'runner dashboard');
+[$status,$body]=request('dashboard.php');
+test($status===200&&substr_count(strtolower($body),'<!doctype html>')===1&&str_contains($body,'Letzte Läufe im Team'),'runner dashboard renders completely');
+$goalCsrf=token($body);$period=weeklyGoalPeriod();weeklyGoalSave((int)$team[1]['id'],$period,['unit'=>'loops','target'=>4]);
+[$status]=request('dashboard.php',['csrf'=>$goalCsrf,'action'=>'weekly_goal_save','goal_unit'=>'hours','goal_value'=>'3.5']);test($status===302,'weekly goal saved');
+test((int)$p->query('SELECT COUNT(*) FROM weekly_goals')->fetchColumn()===2,'team weekly goals persisted');
+$p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,?,?,?,0,UTC_TIMESTAMP())')->execute([99001,$runner,'Goal test',$period['start']->modify('+1 day')->format('Y-m-d H:i:s'),12000,14400]);
+[$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'Wochenziele im Team')&&str_contains($body,'3,5 Std.')&&str_contains($body,'4 Loops'),'team weekly goals visible');
+test((bool)$p->query('SELECT achieved_at FROM weekly_goals WHERE user_id='.$runner.' AND iso_year='.$period['year'].' AND iso_week='.$period['week'])->fetchColumn(),'weekly goal achievement persisted');
+$history=$p->prepare('INSERT INTO weekly_goals(user_id,iso_year,iso_week,unit,target_value,progress_value,achieved_at,updated_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP())');
+foreach([-1,-2] as $offset){$past=weeklyGoalPeriod($period['start']->modify($offset.' week'));$history->execute([$runner,$past['year'],$past['week'],'km',10,10]);}
+[$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'3 Wochen in Folge'),'weekly goal streak visible');
+$teamCsrf=token($body);
+[$status]=request('dashboard.php',['csrf'=>$teamCsrf,'action'=>'team_goal_save','goal_unit'=>'km','goal_value'=>'100']);test($status===302,'team goal saved');
+test((int)$p->query('SELECT COUNT(*) FROM team_weekly_goals')->fetchColumn()===1,'team goal persisted');
+[$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'GEMEINSAME MISSION')&&str_contains($body,'100,0 km'),'team goal visible');
+test((float)$p->query('SELECT progress_value FROM team_weekly_goals')->fetchColumn()===12.0,'team goal progress persisted');
 [$status]=request('challenge.php');test($status===200,'runner challenge');
 [$status]=request('performance.php');test($status===200,'runner performance');
 [$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Hallo New'),'supporter session independent');
