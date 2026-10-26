@@ -14,8 +14,10 @@ $p=db(); if($p->query('SELECT DATABASE()')->fetchColumn()!=='llu27_test') throw 
 $checks=0;
 function test(bool $ok,string $label): void {global $checks; if(!$ok) throw new RuntimeException('FAIL: '.$label); $checks++;}
 foreach(['tim','jonas','noah'] as $name) $p->prepare('INSERT INTO users(username,display_name,password_hash,start_date) VALUES(?,?,?,?)')->execute([$name,ucfirst($name),password_hash('runner-password',PASSWORD_DEFAULT),'2026-01-01']);
-// The pre-existing runner dashboard expects this consent column, absent from base schema.sql.
-$p->exec('ALTER TABLE users ADD COLUMN share_team_hr TINYINT NOT NULL DEFAULT 0');
+// Keep the fixture compatible with both older and current base schemas.
+$shareColumn=$p->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='share_team_hr'");
+$shareColumn->execute();
+if((int)$shareColumn->fetchColumn()===0) $p->exec('ALTER TABLE users ADD COLUMN share_team_hr TINYINT NOT NULL DEFAULT 0');
 $p->exec('CREATE TABLE activity_performance (activity_id BIGINT UNSIGNED PRIMARY KEY,user_id INT UNSIGNED NOT NULL,detail_json LONGTEXT NULL)');
 $p->prepare('INSERT INTO supporters(username,display_name,password_hash) VALUES(?,?,?)')->execute(['support_test','Test Supporter',password_hash('support-password',PASSWORD_DEFAULT)]); $sid=(int)$p->lastInsertId();
 try { $p->prepare('INSERT INTO supporters(username,display_name,password_hash) VALUES(?,?,?)')->execute(['SUPPORT_TEST','duplicate','hash']); test(false,'unique username'); } catch(PDOException $e) { test($e->getCode()==='23000','case insensitive unique username'); }
