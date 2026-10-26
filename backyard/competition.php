@@ -1,8 +1,10 @@
 <?php
 declare(strict_types=1);
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/bootstrap.php';
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/points.php';
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/jokers.php';
+require_once __DIR__.'/partials/private-path.php';
+
+require_once lluPrivatePath('app/bootstrap.php');
+require_once lluPrivatePath('app/points.php');
+require_once lluPrivatePath('app/jokers.php');
 $u=requireUser();$error='';$setupError='';$uid=(int)$u['id'];
 
 if($_SERVER['REQUEST_METHOD']==='POST')try {

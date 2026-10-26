@@ -1,7 +1,9 @@
 <?php
 declare(strict_types=1);
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/supporter.php';
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/supporter_coins.php';
+require_once __DIR__.'/../partials/private-path.php';
+
+require_once lluPrivatePath('app/supporter.php');
+require_once lluPrivatePath('app/supporter_coins.php');
 
 header('Content-Type: application/json; charset=utf-8');
 try{

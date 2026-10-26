@@ -1,3 +1,4 @@
 <?php
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/push.php';
+require_once __DIR__.'/private-path.php';
+require_once lluPrivatePath('app/push.php');
 pushPanel('supporter');

@@ -1,7 +1,8 @@
 <?php
+require_once __DIR__.'/private-path.php';
 // Optional module: a pending supporter migration must never break the runner dashboard.
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/supporter.php';
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/push.php';
+require_once lluPrivatePath('app/supporter.php');
+require_once lluPrivatePath('app/push.php');
 $supporterError=''; $supporterMessages=[]; $supporterReady=false; $sharing=false;
 $supporterAdmin=isSupporterAdminRunner((int)$u['id']);
 try {

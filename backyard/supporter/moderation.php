@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/bootstrap.php';
+require_once __DIR__.'/../partials/private-path.php';
+
+require_once lluPrivatePath('app/bootstrap.php');
 $u=requireUser();
 if(!isSupporterAdminRunner((int)$u['id'])) { http_response_code(403); exit('Kein Zugriff.'); }
 if($_SERVER['REQUEST_METHOD']==='POST') { verifyCsrf(); db()->prepare('DELETE FROM supporter_cheers WHERE id=?')->execute([(int)($_POST['id']??0)]); redirect('supporter/moderation.php'); }
