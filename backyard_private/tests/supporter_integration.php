@@ -80,7 +80,8 @@ test(isset($cookies['supporter']['llu27_supporter_remember']),'remember issued')
 [$status]=request('dashboard.php');test($status===302,'supporter denied runner dashboard');
 [$status,$body]=request('index.php'); $runnerCsrf=token($body);
 [$status]=request('index.php',['csrf'=>$runnerCsrf,'username'=>'tim','password'=>'runner-password']);test($status===302,'runner login while supporter logged in');
-[$status]=request('dashboard.php');test($status===200,'runner dashboard');
+[$status,$body]=request('dashboard.php');
+test($status===200&&substr_count(strtolower($body),'<!doctype html>')===1&&str_contains($body,'Letzte Läufe im Team'),'runner dashboard renders completely');
 [$status]=request('challenge.php');test($status===200,'runner challenge');
 [$status]=request('performance.php');test($status===200,'runner performance');
 [$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Hallo New'),'supporter session independent');
