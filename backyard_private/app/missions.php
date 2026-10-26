@@ -52,12 +52,16 @@ function missionCreate(int $supporterId,array $mission): int {
 function missionCancel(int $supporterId,int $missionId): void {
     $p=db();$p->beginTransaction();
     try {
-        $q=$p->prepare('SELECT supporter_id,cancelled_at,deadline_at>UTC_TIMESTAMP() AS is_open FROM supporter_missions WHERE id=? FOR UPDATE');$q->execute([$missionId]);$mission=$q->fetch();
+        $q=$p->prepare('SELECT supporter_id,cancelled_at,acceptance_mode,deadline_at>UTC_TIMESTAMP() AS is_open FROM supporter_missions WHERE id=? FOR UPDATE');$q->execute([$missionId]);$mission=$q->fetch();
         if(!$mission||(int)$mission['supporter_id']!==$supporterId) throw new RuntimeException('Mission nicht gefunden.');
         if($mission['cancelled_at']!==null) throw new RuntimeException('Diese Mission wurde bereits abgesagt.');
         if(!(bool)$mission['is_open']) throw new RuntimeException('Eine beendete Mission kann nicht mehr abgesagt werden.');
-        $q=$p->prepare('SELECT completed_at FROM supporter_mission_entries WHERE mission_id=? FOR UPDATE');$q->execute([$missionId]);
-        foreach($q->fetchAll(PDO::FETCH_COLUMN) as $completedAt)if($completedAt!==null)throw new RuntimeException('Eine bereits erfüllte Mission kann nicht mehr abgesagt werden.');
+        $q=$p->prepare('SELECT COUNT(*) FROM supporter_mission_entries WHERE mission_id=?');$q->execute([$missionId]);
+        $teamAcceptanceMet=(int)$q->fetchColumn()>=2;
+        if($mission['acceptance_mode']!=='all'||$teamAcceptanceMet) {
+            $q=$p->prepare('SELECT completed_at FROM supporter_mission_entries WHERE mission_id=? FOR UPDATE');$q->execute([$missionId]);
+            foreach($q->fetchAll(PDO::FETCH_COLUMN) as $completedAt)if($completedAt!==null)throw new RuntimeException('Eine bereits erfüllte Mission kann nicht mehr abgesagt werden.');
+        }
         $p->prepare('UPDATE supporter_missions SET cancelled_at=UTC_TIMESTAMP() WHERE id=?')->execute([$missionId]);
         $p->commit();
     } catch(Throwable $e) {if($p->inTransaction())$p->rollBack();throw $e;}
@@ -77,6 +81,10 @@ function missionAccept(int $missionId,int $runnerId): void {
         if(in_array($runnerId,$accepted,true)) throw new RuntimeException('Du hast diese Mission bereits angenommen.');
         if($mission['acceptance_mode']==='exclusive'&&$accepted) throw new RuntimeException('Diese Mission wurde bereits von einem anderen Läufer angenommen.');
         $p->prepare('INSERT INTO supporter_mission_entries(mission_id,runner_id,accepted_at) VALUES(?,?,UTC_TIMESTAMP())')->execute([$missionId,$runnerId]);
+        if($mission['acceptance_mode']==='all'&&count($accepted)===1) {
+            $participants=$p->prepare('SELECT runner_id FROM supporter_mission_entries WHERE mission_id=?');$participants->execute([$missionId]);
+            foreach($participants->fetchAll(PDO::FETCH_COLUMN) as $participantId) missionRefreshRunner((int)$participantId);
+        }
         $p->commit();
     } catch(Throwable $e) {if($p->inTransaction())$p->rollBack();throw $e;}
 }
@@ -93,17 +101,19 @@ function missionRefreshRunner(int $runnerId): void {
             AND a.cache_updated_at>=UTC_TIMESTAMP()-INTERVAL 7 DAY
         ON DUPLICATE KEY UPDATE distance_m=VALUES(distance_m),moving_seconds=VALUES(moving_seconds),completed_loops=VALUES(completed_loops),observed_at=UTC_TIMESTAMP()");
     $credit->execute([$runnerId]);
-    $q=$p->prepare("SELECT e.mission_id,e.runner_id,m.unit,m.target_value,
+    $q=$p->prepare("SELECT e.mission_id,e.runner_id,m.unit,m.target_value,m.acceptance_mode,
+        (SELECT COUNT(*) FROM supporter_mission_entries team_entries WHERE team_entries.mission_id=e.mission_id) accepted_count,
         COALESCE(SUM(CASE m.unit WHEN 'km' THEN a.distance_m/1000 WHEN 'minutes' THEN a.moving_seconds/60 WHEN 'loops' THEN a.completed_loops ELSE 0 END),0) progress
         FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id
         LEFT JOIN supporter_mission_activities a ON a.mission_id=e.mission_id AND a.runner_id=e.runner_id
         WHERE e.runner_id=? AND e.completed_at IS NULL AND m.cancelled_at IS NULL AND m.deadline_at>=UTC_TIMESTAMP()-INTERVAL 8 DAY
-        GROUP BY e.mission_id,e.runner_id,m.unit,m.target_value");
+        GROUP BY e.mission_id,e.runner_id,m.unit,m.target_value,m.acceptance_mode");
     $q->execute([$runnerId]);
-    $save=$p->prepare('UPDATE supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id SET e.progress_value=CAST(? AS DECIMAL(12,2)),e.completed_at=IF(CAST(? AS DECIMAL(12,2))>=m.target_value,UTC_TIMESTAMP(),e.completed_at) WHERE e.mission_id=? AND e.runner_id=? AND m.cancelled_at IS NULL');
+    $save=$p->prepare('UPDATE supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id SET e.progress_value=CAST(? AS DECIMAL(12,2)),e.completed_at=IF(?=1 AND CAST(? AS DECIMAL(12,2))>=m.target_value,UTC_TIMESTAMP(),e.completed_at) WHERE e.mission_id=? AND e.runner_id=? AND m.cancelled_at IS NULL');
     foreach($q->fetchAll() as $row) {
         $progress=round((float)$row['progress'],2);
-        $save->execute([$progress,$progress,(int)$row['mission_id'],$runnerId]);
+        $teamAcceptanceMet=$row['acceptance_mode']!=='all'||(int)$row['accepted_count']>=2;
+        $save->execute([$progress,$teamAcceptanceMet?1:0,$progress,(int)$row['mission_id'],$runnerId]);
     }
 }
 
@@ -125,9 +135,12 @@ function missionList(?int $runnerId=null,bool $supporterView=false): array {
     $now=time();
     foreach($missions as &$mission) {
         $mission['entries']=$byMission[(int)$mission['id']]??[];$mission['own_entry']=null;
+        $mission['accepted_count']=count($mission['entries']);
+        $mission['team_acceptance_met']=$mission['acceptance_mode']!=='all'||$mission['accepted_count']>=2;
         foreach($mission['entries'] as $entry)if($runnerId!==null&&(int)$entry['runner_id']===$runnerId)$mission['own_entry']=$entry;
         $mission['expired']=strtotime($mission['deadline_at'].' UTC')<=$now;
         $mission['open']=$mission['cancelled_at']===null&&!$mission['expired'];
+        $mission['completed']=$mission['team_acceptance_met']&&count(array_filter($mission['entries'],static fn(array $entry):bool=>$entry['completed_at']!==null))>0;
         $mission['can_accept']=$runnerId!==null&&$mission['open']&&$mission['own_entry']===null&&($mission['acceptance_mode']==='all'||count($mission['entries'])===0);
     }
     unset($mission);return $missions;
@@ -137,10 +150,10 @@ function missionPointsBoard(bool $supporterView=false): array {
     $display=$supporterView?"IF(s.runner_id IS NULL,CONCAT(UPPER(LEFT(u.username,1)),SUBSTRING(u.username,2)),u.display_name)":"u.display_name";
     $sharing=$supporterView?' LEFT JOIN supporter_sharing s ON s.runner_id=u.id ':'';
     $group=$supporterView?'u.id,u.username,u.display_name,s.runner_id':'u.id,u.username,u.display_name';
-    return db()->query("SELECT u.id,u.username,$display display_name,CAST(COALESCE(mp.points,0) AS SIGNED)-CAST(COALESCE(jp.penalties,0) AS SIGNED) points,
+    return db()->query("SELECT u.id,u.username,$display display_name,CAST(COALESCE(mp.points,0) AS SIGNED) mission_points,CAST(COALESCE(mp.points,0) AS SIGNED)-CAST(COALESCE(jp.penalties,0) AS SIGNED) points,
         COALESCE(mp.completed,0) completed,COALESCE(jp.failed,0) failed_jokers,COALESCE(jp.penalties,0) penalties
         FROM users u $sharing
-        LEFT JOIN (SELECT e.runner_id,SUM(m.points) points,COUNT(*) completed FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id WHERE e.completed_at IS NOT NULL GROUP BY e.runner_id) mp ON mp.runner_id=u.id
+        LEFT JOIN (SELECT e.runner_id,SUM(m.points) points,COUNT(*) completed FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id WHERE e.completed_at IS NOT NULL AND (m.acceptance_mode='exclusive' OR (SELECT COUNT(*) FROM supporter_mission_entries team_entries WHERE team_entries.mission_id=m.id)>=2) GROUP BY e.runner_id) mp ON mp.runner_id=u.id
         LEFT JOIN (SELECT runner_id,SUM(penalty_points) penalties,COUNT(*) failed FROM supporter_jokers WHERE status='failed' GROUP BY runner_id) jp ON jp.runner_id=u.id
         WHERE u.username IN ('tim','jonas','noah') GROUP BY $group,mp.points,mp.completed,jp.penalties,jp.failed ORDER BY points DESC,completed DESC,FIELD(u.username,'tim','jonas','noah')")->fetchAll();
 }
@@ -159,5 +172,5 @@ function missionDeadline(string $utc): string {
 }
 
 function missionModeLabel(string $mode): string {
-    return $mode==='exclusive'?'Exklusiv · nur der erste Läufer':'Offen · alle Läufer';
+    return $mode==='exclusive'?'Exklusiv · nur der erste Läufer':'Teammission · mindestens 2 Läufer';
 }

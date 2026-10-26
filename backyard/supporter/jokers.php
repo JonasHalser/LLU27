@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
-require_once dirname(__DIR__,3).'/backyard_private/app/supporter.php';
-require_once dirname(__DIR__,3).'/backyard_private/app/jokers.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/supporter.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/jokers.php';
 $u=supporterRequire();$error='';
 if($_SERVER['REQUEST_METHOD']==='POST')try {
     verifyCsrf();
@@ -16,7 +16,7 @@ catch(PDOException $e){$setupError='Supporter-Joker sind noch nicht eingerichtet
 $active=array_values(array_filter($jokers,static fn($j)=>$j['status']==='active'));
 $history=array_values(array_filter($jokers,static fn($j)=>$j['status']!=='active'));
 supporterHead('Joker',$u);?>
-<section class="mission-hero joker-hero"><p class="eyebrow">SUPPORTER · MONATS-JOKER</p><h2>Punkte unter Druck</h2><p>Einmal pro Kalendermonat kannst du einen Läufer herausfordern. Er kann nur seine bereits verdienten Missionspunkte verteidigen: Erfolg gibt keine Belohnung, Scheitern kostet 3 Punkte.</p></section>
+<section class="mission-hero joker-hero"><p class="eyebrow">SUPPORTER · MONATS-JOKER</p><h2>Punkte unter Druck</h2><p>Einmal pro Kalendermonat kannst du einen Läufer herausfordern. Erfolg schützt dessen Gesamtpunktzahl; Scheitern kostet 3 Punkte.</p></section>
 <?php if($error):?><p class="mission-error" role="alert"><?=h($error)?></p><?php endif;?><?php if(isset($_GET['saved'])):?><p class="mission-success" role="status">Joker eingesetzt. Die Herausforderung läuft.</p><?php endif;?>
 <?php if($setupError):?><p class="mission-error"><?=h($setupError)?></p><?php else:?>
 <section class="mission-create"><div class="joker-availability"><div><p class="eyebrow">DEIN JOKER · <?=h($availability['month']['label'])?></p><h2><?=$availability['available']?'Bereit zum Einsatz':'Diesen Monat eingesetzt'?></h2></div><strong class="joker-token<?=$availability['available']?' available':''?>"><?=$availability['available']?'1 / 1':'0 / 1'?></strong></div>

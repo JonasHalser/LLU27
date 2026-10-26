@@ -1,8 +1,8 @@
 <?php
 declare(strict_types=1);
-require_once dirname(__DIR__,2).'/backyard_private/app/bootstrap.php';
-require_once dirname(__DIR__,2).'/backyard_private/app/weekly_goals.php';
-require_once dirname(__DIR__,2).'/backyard_private/app/jokers.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/bootstrap.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/weekly_goals.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/jokers.php';
 $u=requireUser();
 $goalPeriod=weeklyGoalPeriod();
 $err='';$weeklyGoalLocked=false;

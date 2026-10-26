@@ -1,17 +1,32 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__.'/bootstrap.php';
-require_once __DIR__.'/challenge_score.php';
+require_once __DIR__.'/points.php';
 
 function supporterSession(): void {
     if(session_status()===PHP_SESSION_ACTIVE) return;
     session_name('llu27_supporter_session');
     ini_set('session.use_strict_mode','1'); ini_set('session.use_only_cookies','1');
-    session_set_cookie_params(['path'=>'/','secure'=>true,'httponly'=>true,'samesite'=>'Lax']); session_start();
+    session_set_cookie_params(['path'=>'/','secure'=>secureCookiesEnabled(),'httponly'=>true,'samesite'=>'Lax']); session_start();
     header('Cache-Control: no-store'); header('X-Content-Type-Options: nosniff'); header('Referrer-Policy: same-origin');
 }
 function supporterCookie(string $value='', int $expires=0): void {
-    setcookie('llu27_supporter_remember',$value,['expires'=>$expires?:time()-3600,'path'=>'/','secure'=>true,'httponly'=>true,'samesite'=>'Lax']);
+    setcookie('llu27_supporter_remember',$value,['expires'=>$expires?:time()-3600,'path'=>'/','secure'=>secureCookiesEnabled(),'httponly'=>true,'samesite'=>'Lax']);
+}
+function supporterGrantDailyLogin(int $supporterId): int {
+    $reward=max(0,min(10000,(int)cfg('SUPPORTER_DAILY_COIN_REWARD','10')));
+    if($reward===0)return 0;
+    $day=(new DateTimeImmutable('now',new DateTimeZone('Europe/Berlin')))->format('Y-m-d');
+    $p=db();$p->beginTransaction();
+    try {
+        $lock=$p->prepare('SELECT id FROM supporters WHERE id=? FOR UPDATE');$lock->execute([$supporterId]);
+        if(!$lock->fetchColumn()){$p->commit();return 0;}
+        $q=$p->prepare("SELECT id FROM supporter_coin_ledger WHERE supporter_id=? AND entry_type='daily_login' AND reference_key=?");$q->execute([$supporterId,$day]);
+        if($q->fetchColumn()){$p->commit();return 0;}
+        $p->prepare('UPDATE supporters SET coin_balance=coin_balance+? WHERE id=?')->execute([$reward,$supporterId]);
+        $p->prepare("INSERT INTO supporter_coin_ledger(supporter_id,amount,entry_type,reference_key) VALUES(?,?,'daily_login',?)")->execute([$supporterId,$reward,$day]);
+        $p->commit();$_SESSION['supporter_daily_bonus']=$reward;return $reward;
+    } catch(Throwable $e) { if($p->inTransaction())$p->rollBack();throw $e; }
 }
 function supporterToken(int $id): void {
     $selector=bin2hex(random_bytes(12)); $secret=bin2hex(random_bytes(32));
@@ -32,8 +47,9 @@ function supporterCurrent(): ?array {
         } catch(Throwable $e) { $p->rollBack(); throw $e; }
     }
     if(empty($_SESSION['supporter_id'])) return null;
-    $q=db()->prepare('SELECT id,username,display_name,session_version,password_hash FROM supporters WHERE id=?'); $q->execute([$_SESSION['supporter_id']]); $u=$q->fetch();
+    $q=db()->prepare('SELECT id,username,display_name,session_version,password_hash,coin_balance FROM supporters WHERE id=?'); $q->execute([$_SESSION['supporter_id']]); $u=$q->fetch();
     if(!$u || (int)$u['session_version']!==(int)($_SESSION['supporter_version']??0)) { $_SESSION=[]; supporterCookie(); return null; }
+    supporterGrantDailyLogin((int)$u['id']);
     return $u;
 }
 function supporterRequire(): array { $u=supporterCurrent(); if(!$u) redirect('supporter/login.php'); return $u; }
@@ -64,13 +80,13 @@ function supporterTeam(): array {
     return db()->query("SELECT u.id,u.username,IF(s.runner_id IS NULL,CONCAT(UPPER(LEFT(u.username,1)),SUBSTRING(u.username,2)),u.display_name) display_name FROM users u LEFT JOIN supporter_sharing s ON s.runner_id=u.id WHERE u.username IN ('tim','jonas','noah') ORDER BY FIELD(u.username,'tim','jonas','noah')")->fetchAll();
 }
 function supporterScore(): array {
-    return challengeScore(db()->query("SELECT u.username,w.* FROM challenge_weekly w JOIN users u ON u.id=w.user_id WHERE u.username IN ('tim','jonas','noah') ORDER BY iso_year DESC,iso_week DESC")->fetchAll());
+    return teamPointsBoard(true);
 }
 function supporterWeek(?DateTimeImmutable $now=null): array {
-    $now=$now??new DateTimeImmutable('now',new DateTimeZone('UTC'));
+    $now=($now??new DateTimeImmutable('now',new DateTimeZone('UTC')))->setTimezone(new DateTimeZone('UTC'));
     $start=$now->modify('monday this week')->setTime(0,0);
-    // Early cutoff: Monday 18:00 UTC, before the majority of the week's training.
-    return ['year'=>(int)$now->format('o'),'week'=>(int)$now->format('W'),'key'=>$now->format('o-\WW'),'deadline'=>$start->setTime(18,0),'open'=>$now<$start->setTime(18,0)];
+    $deadline=$start->setTimezone(new DateTimeZone('Europe/Berlin'))->modify('+2 days')->setTime(23,59,59)->setTimezone(new DateTimeZone('UTC'));
+    return ['year'=>(int)$now->format('o'),'week'=>(int)$now->format('W'),'key'=>$now->format('o-\WW'),'deadline'=>$deadline,'open'=>$now<$deadline];
 }
 function supporterCheer(int $supporter,int $runner,string $message): void {
     $message=trim($message);
@@ -85,7 +101,7 @@ function supporterCheer(int $supporter,int $runner,string $message): void {
 }
 function supporterTip(int $supporter,int $runner): void {
     $w=supporterWeek();
-    if(!$w['open']) throw new RuntimeException('Annahmeschluss war Montag um 18:00 UTC.');
+    if(!$w['open']) throw new RuntimeException('Annahmeschluss war Mittwoch um 23:59 UTC.');
     if(!in_array($runner,array_map('intval',array_column(supporterTeam(),'id')),true)) throw new RuntimeException('Ungültiger Tipp.');
     // Database clock checks the same deadline inside the write, including racing requests.
     $q=db()->prepare('INSERT INTO supporter_tips(supporter_id,iso_year,iso_week,runner_id) SELECT ?,?,?,? WHERE UTC_TIMESTAMP() < ? ON DUPLICATE KEY UPDATE runner_id=VALUES(runner_id),updated_at=UTC_TIMESTAMP()');
@@ -97,7 +113,30 @@ function supporterTipStatus(array $tip,array $history): string {
     return 'Wertung ausstehend';
 }
 function supporterHead(string $title,?array $u=null): void {
-    ?><!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101923"><title><?=h($title)?> · LLU 27</title><link rel="stylesheet" href="<?=h(url('assets/style.css'))?>"><link rel="stylesheet" href="<?=h(url('supporter/supporter.css'))?>"><link rel="stylesheet" href="<?=h(url('assets/missions.css?v=2'))?>"><link rel="manifest" href="<?=h(url('supporter/manifest.webmanifest'))?>"><link rel="apple-touch-icon" href="<?=h(url('assets/apple-touch-icon.png'))?>"><script src="<?=h(url('supporter/supporter.js'))?>" defer></script></head><body><button class="menu-toggle" aria-expanded="false" aria-controls="supporter-nav">☰ Menü</button><button class="nav-shade" aria-label="Menü schließen" hidden></button><nav id="supporter-nav" aria-label="Supporter-Navigation"><a class="support-brand" href="<?=h(url('supporter/index.php'))?>">LLU <b>27</b><small>SUPPORTER ZONE</small></a><?php foreach(['index.php'=>'Übersicht','index.php#scoreboard'=>'Scoreboard','index.php#cheers'=>'Anfeuern','index.php#tips'=>'Tipps','missions.php'=>'Missionen','jokers.php'=>'Joker','profile.php'=>'Profil','logout.php'=>'Abmelden'] as $p=>$label): if(!$u && $p!=='index.php') continue; ?><a href="<?=h(url('supporter/'.$p))?>"><?=h($label)?></a><?php endforeach; ?><button type="button" class="collapse-nav">Sidebar umschalten</button></nav><main class="support-shell"><header><p class="eyebrow">ONE MORE LOOP · LLU 27</p><h1><?=h($title)?></h1></header><?php
+    if($u){$balance=db()->prepare('SELECT coin_balance FROM supporters WHERE id=?');$balance->execute([$u['id']]);$latest=$balance->fetchColumn();if($latest!==false)$u['coin_balance']=(int)$latest;}
+    $current=basename((string)($_SERVER['SCRIPT_NAME']??''));
+    $links=$u?[
+        ['index.php','Übersicht','▦'],
+        ['bets.php','Wetten','◈'],
+        ['missions.php','Missionen','◆'],
+        ['jokers.php','Joker','!'],
+        ['profile.php','Konto','◉'],
+    ]:[
+        ['login.php','Anmelden','→'],
+        ['register.php','Registrieren','+'],
+    ];
+    $dailyBonus=(int)($_SESSION['supporter_daily_bonus']??0);unset($_SESSION['supporter_daily_bonus']);
+    ?><!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#101923"><title><?=h($title)?> · LLU 27</title><link rel="stylesheet" href="<?=h(url('assets/style.css'))?>"><link rel="stylesheet" href="<?=h(url('supporter/supporter.css?v=7'))?>"><link rel="stylesheet" href="<?=h(url('assets/missions.css?v=2'))?>"><link rel="stylesheet" href="<?=h(url('assets/llu-navigation.css?v=3'))?>"><link rel="manifest" href="<?=h(url('supporter/manifest.webmanifest'))?>"><link rel="apple-touch-icon" href="<?=h(url('assets/apple-touch-icon.png'))?>"><script src="<?=h(url('assets/llu-navigation.js?v=3'))?>" defer></script></head><body class="llu-layout supporter-layout">
+    <button class="llu-menu-button" type="button" id="llu-menu-button" aria-controls="llu-sidebar" aria-expanded="false" aria-label="Navigation öffnen"><span aria-hidden="true">☰</span><span>LLU 27</span><span class="llu-menu-button-label">Menü</span></button>
+    <div class="llu-menu-backdrop" id="llu-menu-backdrop" hidden></div>
+    <aside class="llu-sidebar" id="llu-sidebar" aria-label="Supporter-Navigation">
+        <a class="llu-sidebar-brand" href="<?=h(url('supporter/index.php'))?>"><img src="<?=h(url('assets/llu27-icon.png'))?>" alt="" width="44" height="44"><span><strong>LLU <b>27</b></strong><small>SUPPORTER ZONE</small></span></a>
+        <p class="llu-sidebar-section">SUPPORTER</p><nav class="llu-sidebar-nav" aria-label="Bereiche">
+        <?php foreach($links as [$path,$label,$icon]):?><a href="<?=h(url('supporter/'.$path))?>" class="llu-nav-link<?=$current===$path?' is-current':''?>"<?=$current===$path?' aria-current="page"':''?>><span class="llu-nav-icon" aria-hidden="true"><?=h($icon)?></span><span><?=h($label)?></span></a><?php endforeach;?>
+        </nav><div class="llu-sidebar-bottom">
+        <?php if($u):?><span class="llu-user-label">Angemeldet als <strong><?=h((string)$u['display_name'])?></strong></span><form method="post" action="<?=h(url('supporter/logout.php'))?>"><?php supporterField();?><button type="submit" class="llu-signout">Abmelden</button></form><?php else:?><a class="llu-user-label" href="<?=h(url('supporter/login.php'))?>">Supporter-Anmeldung</a><?php endif;?>
+        <span class="llu-sidebar-motto">ONE MORE LOOP. ONE MORE HOUR.</span></div>
+    </aside><main class="shell support-shell"><header><div><p class="eyebrow">ONE MORE LOOP · LLU 27</p><h1><?=h($title)?></h1></div><?php if($u):?><a class="supporter-coins" href="<?=h(url('supporter/profile.php#coins'))?>"><strong><?=h(number_format((int)($u['coin_balance']??0)))?></strong><span>LLU Coins</span></a><?php endif;?></header><?php if($dailyBonus>0):?><p class="daily-bonus" role="status">Tagesbonus: +<?=h($dailyBonus)?> LLU Coins</p><?php endif;?><?php
 }
 function supporterFoot(): void { echo '</main></body></html>'; }
 function supporterField(): void { echo '<input type="hidden" name="csrf" value="'.h(csrf()).'">'; }
