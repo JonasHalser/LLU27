@@ -1,5 +1,5 @@
 <?php
-declare(strict_types=1);require_once dirname(__DIR__, 2).'/backyard_private/app/bootstrap.php';$u=requireUser();db()->exec('DELETE FROM activities WHERE cache_updated_at < UTC_TIMESTAMP() - INTERVAL 7 DAY');$err='';
+declare(strict_types=1);require_once dirname(__DIR__, 2).'/backyard_private/app/bootstrap.php';require_once dirname(__DIR__, 2).'/backyard_private/app/motivation.php';$u=requireUser();db()->exec('DELETE FROM activities WHERE cache_updated_at < UTC_TIMESTAMP() - INTERVAL 7 DAY');$err='';
 if($_SERVER['REQUEST_METHOD']==='POST')try{verifyCsrf();$action=(string)($_POST['action']??'');if($action==='date'){$date=(string)($_POST['start_date']??'');$dt=DateTimeImmutable::createFromFormat('!Y-m-d',$date);if(!$dt||$dt->format('Y-m-d')!==$date)throw new RuntimeException('Ungültiges Datum');$s=db()->prepare('UPDATE users SET start_date=? WHERE id=?');$s->execute([$date,$u['id']]);redirect('dashboard.php');}if($action==='disconnect'){$s=db()->prepare('DELETE FROM athletes WHERE user_id=?');$s->execute([$u['id']]);$s=db()->prepare('DELETE FROM activities WHERE user_id=?');$s->execute([$u['id']]);redirect('dashboard.php');}}catch(Throwable $e){$err=$e->getMessage();}
 // Teamvergleich der drei LLU-27-Accounts.
 // Fremde HF-Werte nur mit allgemeiner und persönlicher Freigabe ausgeben.
@@ -78,6 +78,13 @@ foreach(['tim','jonas','noah'] as $person){
 
 $a=activeAthlete((int)$u['id']);
 $data=['team'=>$teamChart];
+
+// Countdown bis zum LLU-27-Start (deutsche Ortszeit) und Motivationssprüche für den Typewriter.
+$raceStart=new DateTimeImmutable('2027-04-30 12:00:00',new DateTimeZone('Europe/Berlin'));
+$raceLeft=max(0,$raceStart->getTimestamp()-time());
+$raceParts=['days'=>intdiv($raceLeft,86400),'hours'=>intdiv($raceLeft%86400,3600),'minutes'=>intdiv($raceLeft%3600,60),'seconds'=>$raceLeft%60];
+$motivationQuotes=[];
+try{$motivationQuotes=motivationQuoteTexts();}catch(PDOException $e){if(!motivationTableMissing($e))throw $e;}
 ?><!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LLU 27 · Backyard Running · <?=h($u['display_name'])?></title><link rel="icon" type="image/png" href="assets/llu27-icon.png"><link rel="stylesheet" href="assets/style.css?v=llu27-hf-consent-1"><link rel="apple-touch-icon" href="/assets/apple-touch-icon-v4.png"><link rel="manifest" href="/manifest-v4.webmanifest"><meta name="theme-color" content="#101923"><meta name="apple-mobile-web-app-title" content="LLU 27"><style>
 /* LLU 27: kritische Komponentenstyles – funktionieren auch mit gecachtem externem CSS. */
 .runner-tags{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:20px}
@@ -121,9 +128,36 @@ $data=['team'=>$teamChart];
 .team-controls-note{grid-column:1/-1;color:#aebccd;font-size:12px;line-height:1.5}
 .team-controls-note code{color:#ffaf88}
 .team-entry.is-filtered{display:none}
-</style><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js" defer></script><script src="assets/charts.js?v=llu27-team-all-2" defer></script><link rel="stylesheet" href="assets/llu-navigation.css?v=3"><script src="assets/llu-navigation.js?v=3" defer></script></head><body class="llu-layout">
+
+/* LLU 27: Countdown + Motivations-Typewriter */
+.llu-countdown{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0 0}
+.llu-countdown-unit{min-width:76px;padding:10px 12px 8px;background:#0f1b2a;border:1px solid #354558;border-radius:12px;text-align:center}
+.llu-countdown-unit strong{display:block;font-size:clamp(22px,3vw,32px);font-weight:900;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums}
+.llu-countdown-unit:first-child strong{color:#fc4c02}
+.llu-countdown-unit span{display:block;margin-top:4px;font-size:10px;font-weight:800;letter-spacing:1.5px;color:#9dadbd;text-transform:uppercase}
+.llu-countdown-done{display:none;margin:0;font-size:clamp(20px,3vw,30px);font-weight:900;color:#fc4c02;letter-spacing:1px}
+.llu-countdown.is-finished .llu-countdown-unit{display:none}
+.llu-countdown.is-finished .llu-countdown-done{display:block}
+.llu-countdown-caption{margin:9px 0 0;font-size:11px;letter-spacing:1px;color:#9dadbd}
+.llu-typewriter{margin:16px 0 0;min-height:1.6em;font-size:clamp(14px,1.6vw,18px);font-weight:700;line-height:1.5;color:#ffd2bf}
+.llu-typewriter-caret{display:inline-block;width:2px;height:1.1em;margin-left:3px;vertical-align:-.18em;background:#fc4c02;animation:llu-caret 1s steps(1) infinite}
+@keyframes llu-caret{50%{opacity:0}}
+.llu-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media(max-width:520px){.llu-countdown{gap:7px}.llu-countdown-unit{flex:1 1 0;min-width:0;padding:8px 4px}.llu-typewriter{min-height:3em}}
+@media(prefers-reduced-motion:reduce){.llu-typewriter-caret{animation:none}}
+</style><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js" defer></script><script src="assets/charts.js?v=llu27-team-all-2" defer></script><script src="assets/llu-countdown.js?v=1" defer></script><link rel="stylesheet" href="assets/llu-navigation.css?v=3"><script src="assets/llu-navigation.js?v=3" defer></script></head><body class="llu-layout">
 <?php require __DIR__ . "/partials/navigation.php"; ?>
-<div class="shell"><header class="top"><div class="brand"><img class="brand-icon" src="assets/llu27-icon.png" alt="LLU 27 Logo" width="56" height="56"> LLU <em>27</em> <span class="brand-caption">/ BACKYARD RUNNING</span></div><nav style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><a class="btn outline" href="profile.php" style="padding:9px 13px">Mein Profil</a><form method="post" action="logout.php"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><span class="username"><?=h($u['display_name'])?></span><button class="outline">Abmelden</button></form></nav></header><section class="hero llu-hero"><div class="hero-copy"><p class="eyebrow"><span class="eyebrow-dot"></span> LLU 27 · THE BACKYARD ULTRA PROJECT</p><h1>ONE MORE LOOP.<br><span>ONE MORE HOUR.</span></h1><p class="muted hero-subtitle">6,706 km. Jede Stunde. Bis nur noch einer läuft.</p><div class="runner-tags" role="group" aria-label="Athleten für Teamvergleiche auswählen"><button type="button" class="runner-toggle runner-tim" data-athlete="tim" aria-pressed="true">TIM</button><button type="button" class="runner-toggle runner-jonas" data-athlete="jonas" aria-pressed="true">JONAS</button><button type="button" class="runner-toggle runner-noah" data-athlete="noah" aria-pressed="true">NOAH</button></div><p class="runner-help">Tippe auf einen Namen, um ihn in allen Anzeigen ein- oder auszublenden.</p><p class="hero-footer">THE ROAD TO LLU 27</p></div><div class="pill"><?= $a ? '● Strava verbunden':'○ Strava nicht verbunden' ?></div></section>
+<div class="shell"><header class="top"><div class="brand"><img class="brand-icon" src="assets/llu27-icon.png" alt="LLU 27 Logo" width="56" height="56"> LLU <em>27</em> <span class="brand-caption">/ BACKYARD RUNNING</span></div><nav style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><a class="btn outline" href="profile.php" style="padding:9px 13px">Mein Profil</a><form method="post" action="logout.php"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><span class="username"><?=h($u['display_name'])?></span><button class="outline">Abmelden</button></form></nav></header><section class="hero llu-hero"><div class="hero-copy"><p class="eyebrow"><span class="eyebrow-dot"></span> LLU 27 · THE BACKYARD ULTRA PROJECT</p><h1>ONE MORE LOOP.<br><span>ONE MORE HOUR.</span></h1><p class="muted hero-subtitle">6,706 km. Jede Stunde. Bis nur noch einer läuft.</p><div class="runner-tags" role="group" aria-label="Athleten für Teamvergleiche auswählen"><button type="button" class="runner-toggle runner-tim" data-athlete="tim" aria-pressed="true">TIM</button><button type="button" class="runner-toggle runner-jonas" data-athlete="jonas" aria-pressed="true">JONAS</button><button type="button" class="runner-toggle runner-noah" data-athlete="noah" aria-pressed="true">NOAH</button></div><p class="runner-help">Tippe auf einen Namen, um ihn in allen Anzeigen ein- oder auszublenden.</p><p class="hero-footer">THE ROAD TO LLU 27</p>
+<div class="llu-countdown<?= $raceLeft===0?' is-finished':'' ?>" id="llu-countdown" data-target="<?=h($raceStart->format(DATE_ATOM))?>" role="timer" aria-label="Countdown bis zum Start von LLU 27 am 30.04.2027 um 12:00 Uhr">
+ <div class="llu-countdown-unit"><strong data-unit="days"><?=h((string)$raceParts['days'])?></strong><span>Tage</span></div>
+ <div class="llu-countdown-unit"><strong data-unit="hours"><?=h(sprintf('%02d',$raceParts['hours']))?></strong><span>Std</span></div>
+ <div class="llu-countdown-unit"><strong data-unit="minutes"><?=h(sprintf('%02d',$raceParts['minutes']))?></strong><span>Min</span></div>
+ <div class="llu-countdown-unit"><strong data-unit="seconds"><?=h(sprintf('%02d',$raceParts['seconds']))?></strong><span>Sek</span></div>
+ <p class="llu-countdown-done">RACE DAY – LLU 27 LÄUFT!</p>
+</div>
+<p class="llu-countdown-caption">Start: 30.04.2027 · 12:00 Uhr</p>
+<?php if($motivationQuotes):?><p class="llu-typewriter" id="llu-typewriter"><span class="llu-sr-only"><?=h($motivationQuotes[0])?></span><span class="llu-typewriter-text" aria-hidden="true"></span><span class="llu-typewriter-caret" aria-hidden="true"></span></p>
+<script id="llu-quotes" type="application/json"><?=json_encode(array_values($motivationQuotes),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_UNESCAPED_UNICODE)?></script><?php endif;?></div><div class="pill"><?= $a ? '● Strava verbunden':'○ Strava nicht verbunden' ?></div></section>
 <?php if($err):?><p class="error"><?=h($err)?></p><?php endif;?>
 <?php if(!$a):?><section class="panel intro"><h2>Strava verbinden</h2><p class="muted">Verbinde dein persönliches Konto, damit deine Läufe hier erscheinen.</p><a class="btn" href="connect.php">Mit Strava verbinden ↗</a></section><?php else:?>
 <?php if(isset($_GET['connected'])):?><p class="notice">Strava verbunden. Der nächste Cronjob importiert deine Läufe.</p><?php endif;?>

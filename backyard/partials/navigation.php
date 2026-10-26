@@ -1,11 +1,12 @@
 <?php
 // Shared LLU 27 navigation – only include in authenticated pages.
-// All four pages call requireUser() before including this file.
+// All pages call requireUser() before including this file.
 $lluPage = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
 $lluLinks = [
   ['dashboard.php', 'Dashboard', '▦'],
   ['performance.php', 'Performance', '↗'],
   ['challenge.php', 'Challenge', '★'],
+  ['motivation.php', 'Motivation', '✦'],
   ['profile.php', 'Mein Profil', '◉'],
 ];
 ?>
