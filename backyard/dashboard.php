@@ -19,20 +19,6 @@ if($_SERVER['REQUEST_METHOD']==='POST') try {
   $s=db()->prepare('DELETE FROM athletes WHERE user_id=?');$s->execute([$u['id']]);
   $s=db()->prepare('DELETE FROM activities WHERE user_id=?');$s->execute([$u['id']]);redirect('dashboard.php');
  }
- if($action==='weekly_goal_save') {
-  weeklyGoalSave((int)$u['id'],$goalPeriod,weeklyGoalInput((string)($_POST['goal_unit']??''),(string)($_POST['goal_value']??'')));
-  redirect('dashboard.php#weekly-goals');
- }
- if($action==='weekly_goal_delete') {
-  weeklyGoalDelete((int)$u['id'],$goalPeriod);redirect('dashboard.php#weekly-goals');
- }
- if($action==='team_goal_save') {
-  teamWeeklyGoalSave((int)$u['id'],$goalPeriod,weeklyGoalInput((string)($_POST['goal_unit']??''),(string)($_POST['goal_value']??'')));
-  redirect('dashboard.php#weekly-goals');
- }
- if($action==='team_goal_delete') {
-  teamWeeklyGoalDelete($goalPeriod);redirect('dashboard.php#weekly-goals');
- }
 } catch(Throwable $e) {
  $err=$e instanceof RuntimeException&&!($e instanceof PDOException)?$e->getMessage():'Aktion derzeit nicht möglich.';
 }
@@ -57,8 +43,6 @@ $teamMax = max(1.0, ...array_map(static fn(array $r): float => (float)$r['km'], 
 $teamTotal = array_sum(array_map(static fn(array $r): float => (float)$r['km'], $teamRows));
 $weeklyGoals=[];$weeklyGoalStreaks=[];$teamWeeklyGoal=null;$weeklyGoalError='';
 try{$weeklyGoals=weeklyGoalTeam($goalPeriod);$weeklyGoalStreaks=weeklyGoalStreaks($goalPeriod);$teamWeeklyGoal=teamWeeklyGoal($goalPeriod,$weeklyGoals);}catch(PDOException $e){$weeklyGoalError='Wochenziele sind noch nicht eingerichtet. Bitte die Datenbankmigration ausführen.';}
-$ownGoal=null;
-foreach($weeklyGoals as $goalRow) if((int)$goalRow['id']===(int)$u['id']) {$ownGoal=$goalRow;break;}
 
 // Teamvergleiche nach ISO-Kalenderwochen, jeweils ab individuellem Trainingsstart.
 $teamHeartAllowed=cfg('TEAM_HR_SHARING_APPROVED','0')==='1';
@@ -205,36 +189,7 @@ try{$motivationQuotes=motivationQuoteTexts();}catch(PDOException $e){if(!motivat
 <?php if($a['sync_error']):?><p class="error">Letzter Sync: <?=h($a['sync_error'])?></p><?php endif;?>
 <?php endif;?>
 <section class="settings"><form method="post" class="dateform"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="date"><label>Trainingsstart <input type="date" name="start_date" value="<?=h($u['start_date'])?>" required></label><button class="outline">Übernehmen</button></form><p class="muted tiny">Letzter Sync: <?=h($a['last_sync']??'Noch nicht synchronisiert')?> UTC · Cache max. 7 Tage</p></section>
-<section class="panel weekly-goal-panel" id="weekly-goals" aria-labelledby="weekly-goal-heading">
- <div class="weekly-goal-head"><div><p class="eyebrow">PERSÖNLICHE ZIELE · <?=h($goalPeriod['label'])?></p><h2 id="weekly-goal-heading">Wochenziele im Team</h2></div><p class="muted">Montag 00:00 bis Sonntag 23:59 UTC</p></div>
- <?php if($weeklyGoalError):?><p class="error"><?=h($weeklyGoalError)?></p><?php else:?>
- <div class="team-goal"><div class="team-goal-top"><div><p class="eyebrow">GEMEINSAME MISSION</p><h3>Teamziel</h3><p class="muted">Jeder Läufer kann das gemeinsame Ziel anpassen.</p></div>
- <?php if($teamWeeklyGoal): $teamUnit=(string)$teamWeeklyGoal['unit']; $teamTarget=(float)$teamWeeklyGoal['target_value'];?>
-  <div class="team-goal-progress"><strong><?=h(weeklyGoalValue((float)$teamWeeklyGoal['progress'],$teamUnit))?> / <?=h(weeklyGoalValue($teamTarget,$teamUnit))?></strong><progress max="<?=h((string)$teamTarget)?>" value="<?=h((string)min((float)$teamWeeklyGoal['progress'],$teamTarget))?>"><?=h((string)round((float)$teamWeeklyGoal['percent']))?> %</progress><p><?=h((string)round((float)$teamWeeklyGoal['percent']))?> % erreicht<?=$teamWeeklyGoal['achieved']?' · Gemeinsam geschafft!':''?></p><?php if($teamWeeklyGoal['updated_by_name']):?><small>Zuletzt gesetzt von <?=h($teamWeeklyGoal['updated_by_name'])?></small><?php endif;?></div>
- <?php else:?><p class="weekly-goal-empty">Für diese Woche wurde noch kein Teamziel gesetzt.</p><?php endif;?></div>
- <form method="post" class="weekly-goal-form"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="team_goal_save"><label>Teamziel<input type="number" name="goal_value" min="0.01" max="10080" step="0.01" required value="<?=h($teamWeeklyGoal?(string)(float)$teamWeeklyGoal['target_value']:'')?>" placeholder="z. B. 150"></label><label>Einheit<select name="goal_unit" required><?php foreach(['km'=>'Kilometer','minutes'=>'Minuten','hours'=>'Stunden','loops'=>'Loops'] as $unit=>$label):?><option value="<?=h($unit)?>" <?=($teamWeeklyGoal['unit']??'km')===$unit?'selected':''?>><?=h($label)?></option><?php endforeach;?></select></label><button class="btn" type="submit">Teamziel speichern</button></form>
- <?php if($teamWeeklyGoal):?><form method="post" class="weekly-goal-remove" onsubmit="return confirm('Gemeinsames Teamziel wirklich löschen?')"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="team_goal_delete"><button class="outline" type="submit">Teamziel löschen</button></form><?php endif;?></div>
- <div class="weekly-goal-grid">
- <?php foreach($weeklyGoals as $goal): $goalUnit=(string)($goal['unit']??''); $goalTarget=(float)($goal['target_value']??0); $goalClass='team-'.strtolower((string)$goal['username']); $streak=$weeklyGoalStreaks[$goal['username']]??['current'=>0,'best'=>0];?>
-  <article class="weekly-goal-card <?=h($goalClass)?>"><h3><?=h($goal['display_name'])?></h3>
-  <?php if($goalUnit!==''&&$goalTarget>0):?>
-   <strong><?=h(weeklyGoalValue((float)$goal['progress'],$goalUnit))?> / <?=h(weeklyGoalValue($goalTarget,$goalUnit))?></strong>
-   <progress max="<?=h((string)$goalTarget)?>" value="<?=h((string)min((float)$goal['progress'],$goalTarget))?>"><?=h((string)round((float)$goal['percent']))?> %</progress>
-   <p><?=h((string)round((float)$goal['percent']))?> % erreicht<?=$goal['progress']>=$goalTarget?' · Ziel geschafft!':''?></p>
-  <?php else:?><p class="weekly-goal-empty">Noch kein Ziel für diese Woche.</p><?php endif;?>
-   <p class="goal-streak">🔥 <?=h((string)$streak['current'])?> <?=$streak['current']===1?'Woche':'Wochen'?> in Folge <span class="muted">· Bestserie <?=h((string)$streak['best'])?></span></p>
-  </article>
- <?php endforeach;?>
- </div>
- <form method="post" class="weekly-goal-form"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="weekly_goal_save">
-  <label>Mein Ziel<input type="number" name="goal_value" min="0.01" max="10080" step="0.01" required value="<?=h($ownGoal?(string)(float)$ownGoal['target_value']:'')?>" placeholder="z. B. 50"></label>
-  <label>Einheit<select name="goal_unit" required><?php foreach(['km'=>'Kilometer','minutes'=>'Minuten','hours'=>'Stunden','loops'=>'Loops'] as $unit=>$label):?><option value="<?=h($unit)?>" <?=($ownGoal['unit']??'km')===$unit?'selected':''?>><?=h($label)?></option><?php endforeach;?></select></label>
-  <button class="btn" type="submit">Wochenziel speichern</button>
- </form>
- <?php if($ownGoal):?><form method="post" class="weekly-goal-remove" onsubmit="return confirm('Wochenziel für diese Woche wirklich löschen?')"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="weekly_goal_delete"><button class="outline" type="submit">Mein Ziel löschen</button></form><?php endif;?>
- <p class="team-disclaimer">Der Fortschritt basiert auf den aktuell synchronisierten Strava-Läufen im siebentägigen Cache. Ein Loop zählt nur, wenn 6,706 km innerhalb eines einzelnen Laufs vollständig erreicht wurden.</p>
- <?php endif;?>
-</section>
+<?php $weeklyGoalConfigure=false; require __DIR__.'/partials/weekly-goals.php'; ?>
 <section class="panel team-board" aria-labelledby="team-heading">
  <div class="team-head">
   <div><p class="eyebrow">LLU 27 · TEAMVERGLEICH</p><h2 id="team-heading">Unsere Kilometer im Vergleich</h2><p class="muted">Kilometer pro Läufer ab dem eigenen Trainingsstart · vorhandener Strava-Cache (max. 7 Tage)</p></div>
