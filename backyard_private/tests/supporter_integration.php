@@ -123,11 +123,15 @@ $timeMission=(int)$p->query("SELECT id FROM supporter_missions WHERE title='60 M
 [$status,$runner2Missions]=request('missions.php',null,'runner2');$runner2Csrf=token($runner2Missions);
 [$status,$blocked]=request('missions.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$exclusiveMission],'runner2');test($status===200&&str_contains($blocked,'bereits von einem anderen Läufer angenommen'),'exclusive mission blocks second runner');
 [$status]=request('missions.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$openMission],'runner2');test($status===302,'second runner accepts open mission');
-$p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP(),?,?,0,UTC_TIMESTAMP())')->execute([99002,$runner,'Mission test',21000,7200]);
-$p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP(),?,?,0,UTC_TIMESTAMP())')->execute([99003,(int)$team[1]['id'],'Open mission test',7000,3000]);
+$p->exec('UPDATE supporter_mission_entries SET accepted_at=UTC_TIMESTAMP()-INTERVAL 3 HOUR');
+$p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 2 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99002,$runner,'Mission test',21000,7200]);
+$p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 1 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99003,(int)$team[1]['id'],'Open mission test',7000,3000]);
+$p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()+INTERVAL 1 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99004,$runner,'Future mission test',50000,60]);
 [$status,$missionPage]=request('missions.php');test($status===200&&str_contains($missionPage,'Geschafft · +3 Punkte'),'exclusive mission completed');
 [$status,$runner2Missions]=request('missions.php',null,'runner2');test($status===200&&str_contains($runner2Missions,'Geschafft · +2 Punkte'),'open mission completed independently');
-test((int)$p->query('SELECT COUNT(*) FROM supporter_mission_entries WHERE completed_at IS NOT NULL')->fetchColumn()===4,'mission completions persisted');
+$futureCredit=$p->prepare('SELECT COUNT(*) FROM supporter_mission_activities WHERE activity_id=?');$futureCredit->execute([99004]);test((int)$futureCredit->fetchColumn()===0,'future activity not credited');
+$missionEntries=$p->query('SELECT m.title,u.username,e.progress_value,e.completed_at FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id JOIN users u ON u.id=e.runner_id ORDER BY m.id,u.id')->fetchAll();
+test(count(array_filter($missionEntries,static fn($entry)=>$entry['completed_at']!==null))===4,'mission completions persisted: '.json_encode($missionEntries,JSON_UNESCAPED_UNICODE));
 $missionPoints=missionPointsBoard();test((int)$missionPoints[0]['points']===6&&(int)$missionPoints[1]['points']===2,'mission points awarded');
 [$status,$missionPage]=request('supporter/missions.php');$missionCsrf=token($missionPage);
 [$status,$missionPage]=request('supporter/missions.php',['csrf'=>$missionCsrf,'action'=>'cancel','mission_id'=>$exclusiveMission]);test($status===200&&str_contains($missionPage,'nicht mehr abgesagt'),'completed mission cannot be cancelled');

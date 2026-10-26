@@ -88,7 +88,7 @@ function missionRefreshRunner(int $runnerId): void {
         FROM supporter_mission_entries e
         JOIN supporter_missions m ON m.id=e.mission_id
         JOIN activities a ON a.user_id=e.runner_id AND a.activity_date>=e.accepted_at
-            AND TIMESTAMPADD(SECOND,GREATEST(a.moving_seconds,0),a.activity_date)<=m.deadline_at
+            AND TIMESTAMPADD(SECOND,GREATEST(a.moving_seconds,0),a.activity_date)<=LEAST(m.deadline_at,UTC_TIMESTAMP())
         WHERE e.runner_id=? AND e.completed_at IS NULL AND m.cancelled_at IS NULL AND m.deadline_at>=UTC_TIMESTAMP()-INTERVAL 8 DAY
             AND a.cache_updated_at>=UTC_TIMESTAMP()-INTERVAL 7 DAY
         ON DUPLICATE KEY UPDATE distance_m=VALUES(distance_m),moving_seconds=VALUES(moving_seconds),completed_loops=VALUES(completed_loops),observed_at=UTC_TIMESTAMP()");
