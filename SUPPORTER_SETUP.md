@@ -10,10 +10,14 @@ Kilometer und Läufe sind Cache-Summen ab persönlichem Trainingsstart, kein Lan
 
 Persönliche Wochenziele und das gemeinsame Teamziel verwenden dieselbe UTC-Kalenderwoche wie die Challenge. Jeder Läufer kann sein eigenes Ziel und das gemeinsame Teamziel auf der Navigationsseite `Wochenziele` konfigurieren; das Dashboard zeigt nur die aktuellen Fortschritte. Erreichte persönliche Ziele werden dauerhaft markiert, damit aktuelle und beste Zielserien trotz des siebentägigen Aktivitäts-Caches erhalten bleiben. Der reguläre Sync aktualisiert den Stand der aktuellen und vorherigen Woche automatisch.
 
+Supporter-Missionen befinden sich ausschließlich auf den Unterseiten `/supporter/missions.php` und `/missions.php`; auf den Dashboards erscheinen keine Missionsinhalte. Supporter legen Titel, optionale Beschreibung, Kilometer-, Laufzeit- oder Loop-Ziel, 1–5 Missionspunkte und eine Frist in Berliner Ortszeit fest. Bei exklusiven Missionen sperrt die erste Annahme die Aufgabe für alle anderen Läufer. Offene Missionen können alle drei Läufer unabhängig annehmen und jeweils abschließen. Die Teilnahme ist freiwillig und kann nach der Annahme nicht zurückgegeben werden.
+
+Für den Fortschritt zählen nur synchronisierte Laufaktivitäten, die nach der individuellen Annahme beginnen und anhand ihrer Startzeit plus Bewegungszeit bis zur Frist abgeschlossen sind. Ein persistentes Missions-Ledger bewahrt bereits erkannte Beiträge über den siebentägigen Aktivitäts-Cache hinaus. Der reguläre Strava-Sync aktualisiert offene Missionen; ein Seitenaufruf prüft zusätzlich den aktuellen Cache. Missionspunkte werden nach Erreichen des Ziels dauerhaft in der separaten Missionsrangliste gewertet und verändern die bestehende Backyard-Challenge-Wertung nicht.
+
 ## Hostinger vorbereiten (manuell; kein Deployment wurde ausgeführt)
 
 1. Datenbank sichern. Auf Hostinger PHP **8.2 oder neuer** mit PDO MySQL, mbstring, curl und OpenSSL aktivieren. HTTPS ist erforderlich; Cookies sind ausschließlich `Secure`.
-2. In phpMyAdmin die Dateien `backyard_private/sql/20261024_supporter.sql` und `backyard_private/sql/20261026_weekly_goals.sql` in derselben Datenbank wie `users` importieren. Sie sind wiederholbar, löschen keine Trainingsdaten und setzen die bestehende `users`-Tabelle voraus. Die Wochenziel-Migration ergänzt bei einer bereits installierten ersten Version die Serien-Spalten und legt das gemeinsame Teamziel an. Bei anderweitig angepassten Tabellen Spalten und Typen vorher mit den Migrationen vergleichen.
+2. In phpMyAdmin die Dateien `backyard_private/sql/20261024_supporter.sql`, `backyard_private/sql/20261026_weekly_goals.sql` und `backyard_private/sql/20261026_supporter_missions.sql` in derselben Datenbank wie `users` importieren. Sie sind wiederholbar, löschen keine Trainingsdaten und setzen die bestehende `users`-Tabelle voraus. Die Wochenziel-Migration ergänzt bei einer bereits installierten ersten Version die Serien-Spalten und legt das gemeinsame Teamziel an. Bei anderweitig angepassten Tabellen Spalten und Typen vorher mit den Migrationen vergleichen.
 3. Private Konfiguration in `domains/zjung-partyband.de/backyard_private/.env` ergänzen (siehe unten). Keine Secrets in öffentliche Verzeichnisse, Workflow-Inputs oder Repository schreiben.
 4. Composer-Pakete installieren: im lokalen/private Arbeitsverzeichnis `composer install --no-dev --prefer-dist --optimize-autoloader`. GitHub Actions installiert und überträgt `vendor/` jetzt in das **private** Verzeichnis. SQL wird weiterhin nicht automatisch ausgeführt. Das bestehende manuelle Deployment hat weiterhin `dry_run: true` als Standard. Erst selbst Dry-Run prüfen, anschließend ein gewünschtes Deployment gesondert auslösen.
 5. `APP_URL` muss die tatsächliche öffentliche Basis einschließlich Unterverzeichnis sein: `https://zjung-partyband.de/backyard`. Öffentliche Dateien liegen unter `public_html/backyard/`, private Dateien daneben unter `backyard_private/`. Nicht `backyard_private` unter `public_html` ablegen.
@@ -78,6 +82,7 @@ Staging-Abnahme mit eigener Datenbank und HTTPS:
 - Drei Freigaben einzeln setzen/widerrufen; nur freigegebene Summen anzeigen. Dashboard, Challenge und Performance der Läufer prüfen.
 - Nachricht senden, Empfänger und Cooldown prüfen; XSS-Text muss als Text erscheinen. Läuferansicht und Moderation prüfen.
 - Tipp vor/nach Montag 18:00 UTC prüfen, eine Auswahl pro Woche, Änderung bis Frist; finale Wochen mit Gleichstand, Null-Loops und fehlendem Läufer prüfen.
+- Supporter-Mission mit 1–5 Punkten und Berliner Frist erstellen. Exklusive Mission gleichzeitig mit zwei Läufern annehmen und die atomare Sperre prüfen; offene Mission mit allen Läufern annehmen. Aktivitäten vor der Annahme und nach der Frist dürfen nicht zählen. Kilometer, Laufzeit und vollständige Loops sowie dauerhafte Punkte nach Cache-Ablauf prüfen. Erfüllte Missionen dürfen nicht mehr abgesagt werden.
 - Push auf echtem Desktop und iPhone-PWA aktivieren. Cronjob ausführen, richtigen Empfänger und mehrere Geräte prüfen. Verweigerte Erlaubnis, Abmelden, Gerätewechsel, Ausschalten sowie abgelaufene Abonnements prüfen.
 - Responsive Navigation bei 360, 768 und 1280 Pixeln; Overlay, Escape, Tastaturfokus und Sidebar prüfen.
 
@@ -90,6 +95,8 @@ Neu ist außerdem `.github/workflows/supporter-checks.yml` für Syntax-, Regel- 
 Geändert: `.gitignore`, `.github/workflows/deploy.yml`, `backyard/index.php`, `backyard/dashboard.php`, `backyard/challenge.php`, `backyard/manifest.webmanifest`.
 
 Neu: diese Anleitung; `backyard/supporter/{index,register,login,logout,profile,push,moderation}.php`, `backyard/supporter/{supporter.css,supporter.js,manifest.webmanifest}`, `backyard/assets/supporter-push.js`, `backyard/sw.js`, `backyard/partials/{supporter-runner,supporter-push}.php`, `backyard_private/app/{supporter,push,challenge_score}.php`, `backyard_private/bin/supporter_push.php`, `backyard_private/sql/20261024_supporter.sql`, `backyard_private/composer.json`, `backyard_private/tests/supporter_test.php` und `backyard_private/tests/supporter_integration.php`.
+
+Für die spätere Missionserweiterung kamen `backyard/missions.php`, `backyard/supporter/missions.php`, `backyard/partials/mission-card.php`, `backyard/assets/missions.css`, `backyard_private/app/missions.php` und `backyard_private/sql/20261026_supporter_missions.sql` hinzu.
 
 Vorgeschlagener Commit: `feat: add secure supporter zone with cheers, weekly predictions and web push`.
 

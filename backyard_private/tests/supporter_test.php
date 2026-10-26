@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once dirname(__DIR__).'/app/supporter.php';
 require_once dirname(__DIR__).'/app/push.php';
 require_once dirname(__DIR__).'/app/weekly_goals.php';
+require_once dirname(__DIR__).'/app/missions.php';
 $checks=0;
 function check(bool $condition,string $name): void { global $checks; if(!$condition) throw new RuntimeException('FAIL: '.$name); $checks++; }
 function rejects(callable $f,string $name): void { try { $f(); } catch(RuntimeException $e) { check(true,$name); return; } check(false,$name); }
@@ -56,6 +57,15 @@ $streakRows=[
 check(weeklyGoalStreakStats($streakRows,$streakPeriod)===['current'=>3,'best'=>3],'weekly goal current streak skips open week');
 $streakRows[2]['achieved_at']=null;
 check(weeklyGoalStreakStats($streakRows,$streakPeriod)===['current'=>0,'best'=>2],'weekly goal streak breaks on missed goal');
+$missionNow=new DateTimeImmutable('2026-10-26 10:00:00',$utc);
+$mission=missionInput(['title'=>'20 Kilometer','description'=>"Gemeinsam\r\nstark",'unit'=>'km','target_value'=>'20,5','points'=>'5','acceptance_mode'=>'all','deadline_at'=>'2026-10-27T12:00'],$missionNow);
+check($mission['target']===20.5&&$mission['points']===5&&$mission['description']==="Gemeinsam\nstark"&&$mission['deadline']==='2026-10-27 11:00:00','mission input and Berlin timezone');
+check(missionInput(['title'=>'Loop','unit'=>'loops','target_value'=>'2','points'=>'1','acceptance_mode'=>'exclusive','deadline_at'=>'2026-10-27T12:00'],$missionNow)['mode']==='exclusive','exclusive mission input');
+rejects(fn()=>missionInput(['title'=>'Loop','unit'=>'loops','target_value'=>'1.5','points'=>'3','acceptance_mode'=>'all','deadline_at'=>'2026-10-27T12:00'],$missionNow),'mission whole loops');
+rejects(fn()=>missionInput(['title'=>'Test','unit'=>'km','target_value'=>'5','points'=>'6','acceptance_mode'=>'all','deadline_at'=>'2026-10-27T12:00'],$missionNow),'mission points limit');
+rejects(fn()=>missionInput(['title'=>'Test','unit'=>'km','target_value'=>'5','points'=>'2','acceptance_mode'=>'nobody','deadline_at'=>'2026-10-27T12:00'],$missionNow),'mission mode allowlist');
+rejects(fn()=>missionInput(['title'=>'Test','unit'=>'km','target_value'=>'5','points'=>'2','acceptance_mode'=>'all','deadline_at'=>'2026-10-26T11:03'],$missionNow),'mission future deadline');
+check(missionValue(95,'minutes')==='1 Std. 35 Min.','mission time formatting');
 $encode=static fn($v)=>rtrim(strtr(base64_encode($v),'+/','-_'),'=');
 $sub=['endpoint'=>'https://fcm.googleapis.com/fcm/send/example','keys'=>['p256dh'=>$encode(chr(4).str_repeat('x',64)),'auth'=>$encode(str_repeat('x',16))]];
 check(pushValidate($sub)['contentEncoding']==='aes128gcm','valid subscription');
