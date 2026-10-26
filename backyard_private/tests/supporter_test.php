@@ -34,8 +34,10 @@ check(challengeScore($rows)['history'][0]['winners']===[],'zero loop week has no
 check(challengeScore(array_slice($rows,0,2))['history'][0]['complete']===false,'missing runner');
 check(challengeScore([])['ranking'][0]['points']===0,'empty scoreboard');
 $utc=new DateTimeZone('UTC');
-check(supporterWeek(new DateTimeImmutable('2026-10-19 17:59:59',$utc))['open'],'before cutoff');
-check(!supporterWeek(new DateTimeImmutable('2026-10-19 18:00:00',$utc))['open'],'exact cutoff');
+$betWeek=supporterWeek(new DateTimeImmutable('2026-10-19 18:00:00',$utc));
+check($betWeek['deadline']->format('Y-m-d H:i:s')==='2026-10-21 21:59:59','Wednesday Berlin cutoff');
+check(supporterWeek($betWeek['deadline']->modify('-1 second'))['open'],'before cutoff');
+check(!supporterWeek($betWeek['deadline'])['open'],'exact cutoff');
 check(supporterWeek(new DateTimeImmutable('2027-01-01',$utc))['year']===2026,'ISO year boundary');
 $goal=weeklyGoalInput('km','42,5');
 check($goal===['unit'=>'km','target'=>42.5],'weekly goal comma input');
