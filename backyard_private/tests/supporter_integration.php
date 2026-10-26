@@ -14,8 +14,10 @@ $p=db(); if($p->query('SELECT DATABASE()')->fetchColumn()!=='llu27_test') throw 
 $checks=0;
 function test(bool $ok,string $label): void {global $checks; if(!$ok) throw new RuntimeException('FAIL: '.$label); $checks++;}
 foreach(['tim','jonas','noah'] as $name) $p->prepare('INSERT INTO users(username,display_name,password_hash,start_date) VALUES(?,?,?,?)')->execute([$name,ucfirst($name),password_hash('runner-password',PASSWORD_DEFAULT),'2026-01-01']);
-// The pre-existing runner dashboard expects this consent column, absent from base schema.sql.
-$p->exec('ALTER TABLE users ADD COLUMN share_team_hr TINYINT NOT NULL DEFAULT 0');
+// Keep the fixture compatible with both older and current base schemas.
+$shareColumn=$p->prepare("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='share_team_hr'");
+$shareColumn->execute();
+if((int)$shareColumn->fetchColumn()===0) $p->exec('ALTER TABLE users ADD COLUMN share_team_hr TINYINT NOT NULL DEFAULT 0');
 $p->exec('CREATE TABLE activity_performance (activity_id BIGINT UNSIGNED PRIMARY KEY,user_id INT UNSIGNED NOT NULL,detail_json LONGTEXT NULL)');
 $p->prepare('INSERT INTO supporters(username,display_name,password_hash) VALUES(?,?,?)')->execute(['support_test','Test Supporter',password_hash('support-password',PASSWORD_DEFAULT)]); $sid=(int)$p->lastInsertId();
 try { $p->prepare('INSERT INTO supporters(username,display_name,password_hash) VALUES(?,?,?)')->execute(['SUPPORT_TEST','duplicate','hash']); test(false,'unique username'); } catch(PDOException $e) { test($e->getCode()==='23000','case insensitive unique username'); }
@@ -70,7 +72,8 @@ $ready=false;
 for($i=0;$i<30;$i++){ $socket=@fsockopen('127.0.0.1',8765);if($socket){fclose($socket);$ready=true;break;}usleep(100000); }
 if(!$ready) throw new RuntimeException('HTTP server did not start: '.(is_file($serverLog)?file_get_contents($serverLog):'No server log available.'));
 [$status,$body]=request('supporter/register.php');test($status===200,'registration form');$csrf=token($body);
-[$status]=request('supporter/register.php',['csrf'=>$csrf,'username'=>'new_support','display_name'=>'New','password'=>'new-password-123','confirm'=>'new-password-123']);test($status===302,'registration succeeds');
+[$status,$registrationBody]=request('supporter/register.php',['csrf'=>$csrf,'username'=>'new_support','display_name'=>'New','password'=>'new-password-123','confirm'=>'new-password-123']);test($status===302,'registration succeeds (HTTP '.$status.'): '.substr(trim(strip_tags($registrationBody)),0,300));
+$coinQuery=$p->prepare('SELECT coin_balance FROM supporters WHERE username=?');$coinQuery->execute(['new_support']);test((int)$coinQuery->fetchColumn()===100,'registration grants 100 coins');
 [$status,$body]=request('supporter/register.php',['csrf'=>$csrf,'username'=>'new_support','password'=>'new-password-123','confirm'=>'new-password-123']);test($status===200&&str_contains($body,'bereits vergeben'),'duplicate registration');
 [$status,$body]=request('supporter/login.php');$csrf=token($body);
 [$status,$body]=request('supporter/login.php',['csrf'=>$csrf,'username'=>'new_support','password'=>'wrong']);test($status===200&&str_contains($body,'Passwort falsch'),'wrong password');
@@ -95,7 +98,7 @@ test((int)$p->query('SELECT COUNT(*) FROM supporter_missions')->fetchColumn()===
 [$status,$body]=request('dashboard.php');
 test($status===200&&substr_count(strtolower($body),'<!doctype html>')===1&&str_contains($body,'Letzte Läufe im Team'),'runner dashboard renders completely');
 test(str_contains($body,'href="weekly-goals.php"')&&!str_contains($body,'value="weekly_goal_save"')&&!str_contains($body,'value="team_goal_save"')&&!str_contains($body,'Wochenziele konfigurieren'),'dashboard weekly goals are read only');
-test(str_contains($body,'href="missions.php"')&&str_contains($body,'href="jokers.php"')&&!str_contains($body,'20 Kilometer exklusiv')&&!str_contains($body,'value="accept"'),'runner dashboard has feature navigation only');
+test(str_contains($body,'href="competition.php"')&&!str_contains($body,'20 Kilometer exklusiv')&&!str_contains($body,'value="accept"'),'runner dashboard links to combined competition page only');
 [$status,$goalPage]=request('weekly-goals.php');
 test($status===200&&str_contains($goalPage,'value="weekly_goal_save"')&&str_contains($goalPage,'value="team_goal_save"'),'weekly goal settings page');
 $goalCsrf=token($goalPage);$period=weeklyGoalPeriod();weeklyGoalSave((int)$team[1]['id'],$period,['unit'=>'loops','target'=>4]);
@@ -118,19 +121,20 @@ foreach([-1,-2] as $offset){$past=weeklyGoalPeriod($period['start']->modify($off
 test((int)$p->query('SELECT COUNT(*) FROM team_weekly_goals')->fetchColumn()===1,'team goal persisted');
 [$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'GEMEINSAME MISSION')&&str_contains($body,'100,0 km'),'team goal visible');
 test((float)$p->query('SELECT progress_value FROM team_weekly_goals')->fetchColumn()===12.0,'team goal progress persisted');
-[$status,$missionPage]=request('missions.php');test($status===200&&str_contains($missionPage,'20 Kilometer exklusiv')&&str_contains($missionPage,'Ein Loop für alle'),'runner mission page');$runnerMissionCsrf=token($missionPage);
+[$status,$missionPage]=request('competition.php');test($status===200&&str_contains($missionPage,'20 Kilometer exklusiv')&&str_contains($missionPage,'Ein Loop für alle'),'combined runner competition page');$runnerMissionCsrf=token($missionPage);
 $exclusiveMission=(int)$p->query("SELECT id FROM supporter_missions WHERE title='20 Kilometer exklusiv'")->fetchColumn();
 $openMission=(int)$p->query("SELECT id FROM supporter_missions WHERE title='Ein Loop für alle'")->fetchColumn();
 $timeMission=(int)$p->query("SELECT id FROM supporter_missions WHERE title='60 Minuten laufen'")->fetchColumn();
-[$status]=request('missions.php',['csrf'=>$runnerMissionCsrf,'action'=>'accept','mission_id'=>$exclusiveMission]);test($status===302,'runner accepts exclusive mission');
-[$status]=request('missions.php',['csrf'=>$runnerMissionCsrf,'action'=>'accept','mission_id'=>$openMission]);test($status===302,'runner accepts open mission');
-[$status]=request('missions.php',['csrf'=>$runnerMissionCsrf,'action'=>'accept','mission_id'=>$timeMission]);test($status===302,'runner accepts time mission');
+[$status]=request('competition.php',['csrf'=>$runnerMissionCsrf,'action'=>'accept','mission_id'=>$exclusiveMission]);test($status===302,'runner accepts exclusive mission');
+[$status]=request('competition.php',['csrf'=>$runnerMissionCsrf,'action'=>'accept','mission_id'=>$openMission]);test($status===302,'runner accepts open mission');
+[$status]=request('competition.php',['csrf'=>$runnerMissionCsrf,'action'=>'accept','mission_id'=>$timeMission]);test($status===302,'runner accepts time mission');
 [$status,$runner2Login]=request('index.php',null,'runner2');$runner2Csrf=token($runner2Login);
 [$status]=request('index.php',['csrf'=>$runner2Csrf,'username'=>'jonas','password'=>'runner-password'], 'runner2');test($status===302,'second runner login');
 [$status,$runner2Goals]=request('weekly-goals.php',null,'runner2');test($status===200&&str_contains($runner2Goals,'bis zum Ende dieser Woche gesperrt')&&!str_contains($runner2Goals,'value="weekly_goal_save"'),'joker locks runner weekly goal settings');
-[$status,$runner2Missions]=request('missions.php',null,'runner2');$runner2Csrf=token($runner2Missions);
-[$status,$blocked]=request('missions.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$exclusiveMission],'runner2');test($status===200&&str_contains($blocked,'bereits von einem anderen Läufer angenommen'),'exclusive mission blocks second runner');
-[$status]=request('missions.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$openMission],'runner2');test($status===302,'second runner accepts open mission');
+[$status,$runner2Missions]=request('competition.php',null,'runner2');$runner2Csrf=token($runner2Missions);
+[$status,$blocked]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$exclusiveMission],'runner2');test($status===200&&str_contains($blocked,'bereits von einem anderen Läufer angenommen'),'exclusive mission blocks second runner');
+[$status]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$openMission],'runner2');test($status===302,'second runner accepts open mission');
+[$status]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$timeMission],'runner2');test($status===302,'second runner accepts time mission');
 $p->exec('UPDATE supporter_mission_entries SET accepted_at=UTC_TIMESTAMP()-INTERVAL 3 HOUR');
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 2 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99002,$runner,'Mission test',21000,7200]);
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 1 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99003,(int)$team[1]['id'],'Open mission test',7000,3000]);
@@ -146,16 +150,16 @@ $p->prepare("UPDATE supporter_jokers SET issued_at=UTC_TIMESTAMP()-INTERVAL 3 HO
 jokerRefreshAll();
 test($p->query("SELECT status FROM supporter_jokers WHERE supporter_id=$sid")->fetchColumn()==='succeeded','thirty hour joker succeeds with qualifying run');
 test($p->query("SELECT status FROM supporter_jokers WHERE supporter_id=$nextJokerSupporter")->fetchColumn()==='failed','next run joker fails on short next run');
-[$status,$runnerJokers]=request('jokers.php');test($status===200&&str_contains($runnerJokers,'Verteidige deine Punkte')&&str_contains($runnerJokers,'Nicht geschafft'),'runner joker page shows results');
-[$status,$missionPage]=request('missions.php');test($status===200&&str_contains($missionPage,'Geschafft · +3 Punkte'),'exclusive mission completed');
-[$status,$runner2Missions]=request('missions.php',null,'runner2');test($status===200&&str_contains($runner2Missions,'Geschafft · +2 Punkte'),'open mission completed independently');
+[$status,$runnerCompetition]=request('competition.php');test($status===200&&str_contains($runnerCompetition,'Joker für dich')&&str_contains($runnerCompetition,'Joker nicht geschafft'),'combined page shows joker results');
+test(str_contains($runnerCompetition,'Geschafft · +3 Punkte'),'exclusive mission completed');
+[$status,$runner2Competition]=request('competition.php',null,'runner2');test($status===200&&str_contains($runner2Competition,'Geschafft · +2 Punkte'),'open mission completed independently');
 $futureCredit=$p->prepare('SELECT COUNT(*) FROM supporter_mission_activities WHERE activity_id=?');$futureCredit->execute([99004]);test((int)$futureCredit->fetchColumn()===0,'future activity not credited');
 $missionEntries=$p->query('SELECT m.title,u.username,e.progress_value,e.completed_at FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id JOIN users u ON u.id=e.runner_id ORDER BY m.id,u.id')->fetchAll();
 test(count(array_filter($missionEntries,static fn($entry)=>$entry['completed_at']!==null))===4,'mission completions persisted: '.json_encode($missionEntries,JSON_UNESCAPED_UNICODE));
 $missionPoints=missionPointsBoard();$pointsByRunner=array_column($missionPoints,'points','username');test((int)$pointsByRunner['tim']===3&&(int)$pointsByRunner['jonas']===-1,'joker penalties deducted from mission points');
 [$status,$missionPage]=request('supporter/missions.php');$missionCsrf=token($missionPage);
 [$status,$missionPage]=request('supporter/missions.php',['csrf'=>$missionCsrf,'action'=>'cancel','mission_id'=>$exclusiveMission]);test($status===200&&str_contains($missionPage,'nicht mehr abgesagt'),'completed mission cannot be cancelled');
-[$status]=request('challenge.php');test($status===200,'runner challenge');
+[$status,, $challengeHeaders]=request('challenge.php');test($status===302&&str_contains(implode('', $challengeHeaders),'competition.php#challenge'),'legacy challenge route redirects to combined competition page');
 [$status]=request('performance.php');test($status===200,'runner performance');
 [$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Hallo New'),'supporter session independent');
 test(isset($cookies['supporter']['backyard_session'])&&isset($cookies['supporter']['llu27_supporter_session']),'separate session cookies');

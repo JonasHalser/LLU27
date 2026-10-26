@@ -53,4 +53,10 @@ jobs:
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_missions.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_jokers.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_jokers.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_coins.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_coins.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_daily_bonus.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_daily_bonus.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_custom_bets.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_custom_bets.sql
           php backyard_private/tests/supporter_integration.php
