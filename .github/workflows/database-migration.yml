@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       sql_file:
-        description: "Dateiname aus backyard_private/sql, z. B. 20261026_weekly_goals.sql"
+        description: "Dateiname aus backyard_private/sql, z. B. 20261026_supporter_missions.sql"
         required: true
-        default: "20261026_weekly_goals.sql"
+        default: "20261026_supporter_missions.sql"
         type: string
       confirmation:
         description: "Zur Bestätigung exakt APPLY eingeben"

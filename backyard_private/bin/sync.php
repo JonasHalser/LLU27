@@ -9,6 +9,7 @@ if (PHP_SAPI !== 'cli') {
 require_once dirname(__DIR__) . '/app/sync.php';
 require_once dirname(__DIR__) . '/app/performance_sync.php';
 require_once dirname(__DIR__) . '/app/weekly_goals.php';
+require_once dirname(__DIR__) . '/app/missions.php';
 
 $lock = fopen(dirname(__DIR__) . '/sync.lock', 'c');
 
@@ -27,6 +28,14 @@ try {
     } catch (PDOException $e) {
         // Training sync remains available until the optional migration is installed.
         echo "Wochenziele noch nicht eingerichtet\n";
+    }
+
+    try {
+        missionRefreshAll();
+        echo "Supporter-Missionen aktualisiert\n";
+    } catch (PDOException $e) {
+        // Training sync remains available until the optional migration is installed.
+        echo "Supporter-Missionen noch nicht eingerichtet\n";
     }
 
     foreach (ll27SyncPerformance() as $line) {

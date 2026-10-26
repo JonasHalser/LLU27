@@ -1,4 +1,4 @@
-name: Supporter checks
+name: Validate changes
 on:
   pull_request:
   push:
@@ -8,6 +8,7 @@ permissions:
   contents: read
 jobs:
   checks:
+    name: Run tests
     runs-on: ubuntu-latest
     services:
       mysql:
@@ -48,4 +49,6 @@ jobs:
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261024_supporter.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_weekly_goals.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_weekly_goals.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_missions.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_missions.sql
           php backyard_private/tests/supporter_integration.php
