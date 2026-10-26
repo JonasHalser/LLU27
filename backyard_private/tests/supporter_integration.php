@@ -72,7 +72,8 @@ $ready=false;
 for($i=0;$i<30;$i++){ $socket=@fsockopen('127.0.0.1',8765);if($socket){fclose($socket);$ready=true;break;}usleep(100000); }
 if(!$ready) throw new RuntimeException('HTTP server did not start: '.(is_file($serverLog)?file_get_contents($serverLog):'No server log available.'));
 [$status,$body]=request('supporter/register.php');test($status===200,'registration form');$csrf=token($body);
-[$status]=request('supporter/register.php',['csrf'=>$csrf,'username'=>'new_support','display_name'=>'New','password'=>'new-password-123','confirm'=>'new-password-123']);test($status===302,'registration succeeds');
+[$status,$registrationBody]=request('supporter/register.php',['csrf'=>$csrf,'username'=>'new_support','display_name'=>'New','password'=>'new-password-123','confirm'=>'new-password-123']);test($status===302,'registration succeeds (HTTP '.$status.'): '.substr(trim(strip_tags($registrationBody)),0,300));
+$coinQuery=$p->prepare('SELECT coin_balance FROM supporters WHERE username=?');$coinQuery->execute(['new_support']);test((int)$coinQuery->fetchColumn()===100,'registration grants 100 coins');
 [$status,$body]=request('supporter/register.php',['csrf'=>$csrf,'username'=>'new_support','password'=>'new-password-123','confirm'=>'new-password-123']);test($status===200&&str_contains($body,'bereits vergeben'),'duplicate registration');
 [$status,$body]=request('supporter/login.php');$csrf=token($body);
 [$status,$body]=request('supporter/login.php',['csrf'=>$csrf,'username'=>'new_support','password'=>'wrong']);test($status===200&&str_contains($body,'Passwort falsch'),'wrong password');
