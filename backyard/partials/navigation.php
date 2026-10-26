@@ -6,6 +6,7 @@ $lluLinks = [
   ['dashboard.php', 'Dashboard', '▦'],
   ['weekly-goals.php', 'Wochenziele', '◎'],
   ['missions.php', 'Missionen', '◆'],
+  ['jokers.php', 'Joker', '!'],
   ['performance.php', 'Performance', '↗'],
   ['challenge.php', 'Challenge', '★'],
   ['motivation.php', 'Motivation', '✦'],

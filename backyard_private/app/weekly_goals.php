@@ -71,7 +71,7 @@ function weeklyGoalTeam(array $period): array {
         ORDER BY FIELD(u.username,'tim','jonas','noah')");
     $q->execute([$period['year'],$period['week'],$period['start']->format('Y-m-d H:i:s'),$period['end']->format('Y-m-d H:i:s')]);
     $rows=$q->fetchAll();
-    $snapshot=db()->prepare('UPDATE weekly_goals SET progress_value=GREATEST(progress_value,?),achieved_at=IF(achieved_at IS NULL AND ?>=target_value,UTC_TIMESTAMP(),achieved_at) WHERE user_id=? AND iso_year=? AND iso_week=?');
+    $snapshot=db()->prepare('UPDATE weekly_goals SET progress_value=GREATEST(progress_value,CAST(? AS DECIMAL(12,2))),achieved_at=IF(achieved_at IS NULL AND CAST(? AS DECIMAL(12,2))>=target_value,UTC_TIMESTAMP(),achieved_at) WHERE user_id=? AND iso_year=? AND iso_week=?');
     foreach($rows as &$row) {
         $live=weeklyGoalProgress($row);
         $row['progress']=max($live,(float)($row['progress_value']??0));
@@ -139,7 +139,7 @@ function teamWeeklyGoal(array $period,array $teamRows): ?array {
     $live=weeklyGoalProgress($totals);$goal['progress']=max($live,(float)$goal['progress_value']);
     $target=(float)$goal['target_value'];$goal['percent']=min(100.0,$goal['progress']/$target*100);
     $goal['achieved']=$goal['achieved_at']!==null||$goal['progress']>=$target;
-    $update=db()->prepare('UPDATE team_weekly_goals SET progress_value=GREATEST(progress_value,?),achieved_at=IF(achieved_at IS NULL AND ?>=target_value,UTC_TIMESTAMP(),achieved_at) WHERE iso_year=? AND iso_week=?');
+    $update=db()->prepare('UPDATE team_weekly_goals SET progress_value=GREATEST(progress_value,CAST(? AS DECIMAL(12,2))),achieved_at=IF(achieved_at IS NULL AND CAST(? AS DECIMAL(12,2))>=target_value,UTC_TIMESTAMP(),achieved_at) WHERE iso_year=? AND iso_week=?');
     $update->execute([$goal['progress'],$goal['progress'],$period['year'],$period['week']]);
     return $goal;
 }

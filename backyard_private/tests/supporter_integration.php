@@ -9,6 +9,7 @@ register_shutdown_function(static function()use($env){unlink($env);});
 require_once $private.'/app/supporter.php';
 require_once $private.'/app/weekly_goals.php';
 require_once $private.'/app/missions.php';
+require_once $private.'/app/jokers.php';
 $p=db(); if($p->query('SELECT DATABASE()')->fetchColumn()!=='llu27_test') throw new RuntimeException('Unsafe database.');
 $checks=0;
 function test(bool $ok,string $label): void {global $checks; if(!$ok) throw new RuntimeException('FAIL: '.$label); $checks++;}
@@ -94,14 +95,20 @@ test((int)$p->query('SELECT COUNT(*) FROM supporter_missions')->fetchColumn()===
 [$status,$body]=request('dashboard.php');
 test($status===200&&substr_count(strtolower($body),'<!doctype html>')===1&&str_contains($body,'Letzte Läufe im Team'),'runner dashboard renders completely');
 test(str_contains($body,'href="weekly-goals.php"')&&!str_contains($body,'value="weekly_goal_save"')&&!str_contains($body,'value="team_goal_save"')&&!str_contains($body,'Wochenziele konfigurieren'),'dashboard weekly goals are read only');
-test(str_contains($body,'href="missions.php"')&&!str_contains($body,'20 Kilometer exklusiv')&&!str_contains($body,'value="accept"'),'runner dashboard has mission navigation only');
+test(str_contains($body,'href="missions.php"')&&str_contains($body,'href="jokers.php"')&&!str_contains($body,'20 Kilometer exklusiv')&&!str_contains($body,'value="accept"'),'runner dashboard has feature navigation only');
 [$status,$goalPage]=request('weekly-goals.php');
 test($status===200&&str_contains($goalPage,'value="weekly_goal_save"')&&str_contains($goalPage,'value="team_goal_save"'),'weekly goal settings page');
 $goalCsrf=token($goalPage);$period=weeklyGoalPeriod();weeklyGoalSave((int)$team[1]['id'],$period,['unit'=>'loops','target'=>4]);
 [$status]=request('weekly-goals.php',['csrf'=>$goalCsrf,'action'=>'weekly_goal_save','goal_unit'=>'hours','goal_value'=>'3.5']);test($status===302,'weekly goal saved');
 test((int)$p->query('SELECT COUNT(*) FROM weekly_goals')->fetchColumn()===2,'team weekly goals persisted');
+$newSupporter=(int)$p->query("SELECT id FROM supporters WHERE username='new_support'")->fetchColumn();
+[$status,$jokerPage]=request('supporter/jokers.php');test($status===200&&str_contains($jokerPage,'Punkte unter Druck')&&str_contains($jokerPage,'value="weekly_boost"'),'supporter joker form');$jokerCsrf=token($jokerPage);
+[$status]=request('supporter/jokers.php',['csrf'=>$jokerCsrf,'action'=>'create','runner_id'=>$team[1]['id'],'joker_type'=>'weekly_boost']);test($status===302,'monthly weekly goal joker created');
+test((float)$p->query('SELECT target_value FROM weekly_goals WHERE user_id='.(int)$team[1]['id'].' AND iso_year='.$period['year'].' AND iso_week='.$period['week'])->fetchColumn()===5.0,'weekly goal joker raises target and rounds loops up');
+[$status,$duplicateJoker]=request('supporter/jokers.php',['csrf'=>$jokerCsrf,'action'=>'create','runner_id'=>$runner,'joker_type'=>'next_run_150']);test($status===200&&str_contains($duplicateJoker,'bereits eingesetzt'),'one joker per supporter and month');
+try{jokerAssertWeeklyGoalEditable((int)$team[1]['id'],$period);test(false,'boosted weekly goal locked');}catch(RuntimeException $e){test(true,'boosted weekly goal locked');}
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,?,?,?,0,UTC_TIMESTAMP())')->execute([99001,$runner,'Goal test',$period['start']->modify('+1 day')->format('Y-m-d H:i:s'),12000,14400]);
-[$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'Wochenziele im Team')&&str_contains($body,'3,5 Std.')&&str_contains($body,'4 Loops'),'team weekly goals visible');
+[$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'Wochenziele im Team')&&str_contains($body,'3,5 Std.')&&str_contains($body,'5 Loops'),'boosted weekly goal visible');
 test((bool)$p->query('SELECT achieved_at FROM weekly_goals WHERE user_id='.$runner.' AND iso_year='.$period['year'].' AND iso_week='.$period['week'])->fetchColumn(),'weekly goal achievement persisted');
 $history=$p->prepare('INSERT INTO weekly_goals(user_id,iso_year,iso_week,unit,target_value,progress_value,achieved_at,updated_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP())');
 foreach([-1,-2] as $offset){$past=weeklyGoalPeriod($period['start']->modify($offset.' week'));$history->execute([$runner,$past['year'],$past['week'],'km',10,10]);}
@@ -120,6 +127,7 @@ $timeMission=(int)$p->query("SELECT id FROM supporter_missions WHERE title='60 M
 [$status]=request('missions.php',['csrf'=>$runnerMissionCsrf,'action'=>'accept','mission_id'=>$timeMission]);test($status===302,'runner accepts time mission');
 [$status,$runner2Login]=request('index.php',null,'runner2');$runner2Csrf=token($runner2Login);
 [$status]=request('index.php',['csrf'=>$runner2Csrf,'username'=>'jonas','password'=>'runner-password'], 'runner2');test($status===302,'second runner login');
+[$status,$runner2Goals]=request('weekly-goals.php',null,'runner2');test($status===200&&str_contains($runner2Goals,'bis zum Ende dieser Woche gesperrt')&&!str_contains($runner2Goals,'value="weekly_goal_save"'),'joker locks runner weekly goal settings');
 [$status,$runner2Missions]=request('missions.php',null,'runner2');$runner2Csrf=token($runner2Missions);
 [$status,$blocked]=request('missions.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$exclusiveMission],'runner2');test($status===200&&str_contains($blocked,'bereits von einem anderen Läufer angenommen'),'exclusive mission blocks second runner');
 [$status]=request('missions.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$openMission],'runner2');test($status===302,'second runner accepts open mission');
@@ -127,12 +135,24 @@ $p->exec('UPDATE supporter_mission_entries SET accepted_at=UTC_TIMESTAMP()-INTER
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 2 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99002,$runner,'Mission test',21000,7200]);
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 1 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99003,(int)$team[1]['id'],'Open mission test',7000,3000]);
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()+INTERVAL 1 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99004,$runner,'Future mission test',50000,60]);
+$p->prepare("UPDATE supporter_jokers SET deadline_at=UTC_TIMESTAMP()-INTERVAL 1 MINUTE WHERE supporter_id=? AND joker_type='weekly_boost'")->execute([$newSupporter]);
+jokerRefreshAll();
+test($p->query("SELECT status FROM supporter_jokers WHERE supporter_id=$newSupporter")->fetchColumn()==='failed','expired weekly joker fails');
+jokerCreate($sid,$runner,'run_30h');
+$p->prepare("UPDATE supporter_jokers SET issued_at=UTC_TIMESTAMP()-INTERVAL 3 HOUR,deadline_at=UTC_TIMESTAMP()+INTERVAL 27 HOUR WHERE supporter_id=? AND joker_type='run_30h'")->execute([$sid]);
+$p->prepare('INSERT INTO supporters(username,display_name,password_hash) VALUES(?,?,?)')->execute(['joker_next','Next Joker',password_hash('support-password',PASSWORD_DEFAULT)]);$nextJokerSupporter=(int)$p->lastInsertId();
+jokerCreate($nextJokerSupporter,$runner,'next_run_150');
+$p->prepare("UPDATE supporter_jokers SET issued_at=UTC_TIMESTAMP()-INTERVAL 3 HOUR WHERE supporter_id=? AND joker_type='next_run_150'")->execute([$nextJokerSupporter]);
+jokerRefreshAll();
+test($p->query("SELECT status FROM supporter_jokers WHERE supporter_id=$sid")->fetchColumn()==='succeeded','thirty hour joker succeeds with qualifying run');
+test($p->query("SELECT status FROM supporter_jokers WHERE supporter_id=$nextJokerSupporter")->fetchColumn()==='failed','next run joker fails on short next run');
+[$status,$runnerJokers]=request('jokers.php');test($status===200&&str_contains($runnerJokers,'Verteidige deine Punkte')&&str_contains($runnerJokers,'Nicht geschafft'),'runner joker page shows results');
 [$status,$missionPage]=request('missions.php');test($status===200&&str_contains($missionPage,'Geschafft · +3 Punkte'),'exclusive mission completed');
 [$status,$runner2Missions]=request('missions.php',null,'runner2');test($status===200&&str_contains($runner2Missions,'Geschafft · +2 Punkte'),'open mission completed independently');
 $futureCredit=$p->prepare('SELECT COUNT(*) FROM supporter_mission_activities WHERE activity_id=?');$futureCredit->execute([99004]);test((int)$futureCredit->fetchColumn()===0,'future activity not credited');
 $missionEntries=$p->query('SELECT m.title,u.username,e.progress_value,e.completed_at FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id JOIN users u ON u.id=e.runner_id ORDER BY m.id,u.id')->fetchAll();
 test(count(array_filter($missionEntries,static fn($entry)=>$entry['completed_at']!==null))===4,'mission completions persisted: '.json_encode($missionEntries,JSON_UNESCAPED_UNICODE));
-$missionPoints=missionPointsBoard();test((int)$missionPoints[0]['points']===6&&(int)$missionPoints[1]['points']===2,'mission points awarded');
+$missionPoints=missionPointsBoard();$pointsByRunner=array_column($missionPoints,'points','username');test((int)$pointsByRunner['tim']===3&&(int)$pointsByRunner['jonas']===-1,'joker penalties deducted from mission points');
 [$status,$missionPage]=request('supporter/missions.php');$missionCsrf=token($missionPage);
 [$status,$missionPage]=request('supporter/missions.php',['csrf'=>$missionCsrf,'action'=>'cancel','mission_id'=>$exclusiveMission]);test($status===200&&str_contains($missionPage,'nicht mehr abgesagt'),'completed mission cannot be cancelled');
 [$status]=request('challenge.php');test($status===200,'runner challenge');

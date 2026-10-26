@@ -51,4 +51,6 @@ jobs:
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_weekly_goals.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_missions.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_missions.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_jokers.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_supporter_jokers.sql
           php backyard_private/tests/supporter_integration.php

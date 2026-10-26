@@ -4,6 +4,7 @@ require_once dirname(__DIR__).'/app/supporter.php';
 require_once dirname(__DIR__).'/app/push.php';
 require_once dirname(__DIR__).'/app/weekly_goals.php';
 require_once dirname(__DIR__).'/app/missions.php';
+require_once dirname(__DIR__).'/app/jokers.php';
 $checks=0;
 function check(bool $condition,string $name): void { global $checks; if(!$condition) throw new RuntimeException('FAIL: '.$name); $checks++; }
 function rejects(callable $f,string $name): void { try { $f(); } catch(RuntimeException $e) { check(true,$name); return; } check(false,$name); }
@@ -66,6 +67,11 @@ rejects(fn()=>missionInput(['title'=>'Test','unit'=>'km','target_value'=>'5','po
 rejects(fn()=>missionInput(['title'=>'Test','unit'=>'km','target_value'=>'5','points'=>'2','acceptance_mode'=>'nobody','deadline_at'=>'2026-10-27T12:00'],$missionNow),'mission mode allowlist');
 rejects(fn()=>missionInput(['title'=>'Test','unit'=>'km','target_value'=>'5','points'=>'2','acceptance_mode'=>'all','deadline_at'=>'2026-10-26T11:03'],$missionNow),'mission future deadline');
 check(missionValue(95,'minutes')==='1 Std. 35 Min.','mission time formatting');
+check(jokerBoostedTarget(4,'loops')===5.0,'weekly joker rounds whole loops up');
+check(jokerBoostedTarget(42.5,'km')===51.0,'weekly joker adds twenty percent');
+check(jokerDistanceTarget(10000,'run_30h')===7500.0,'thirty hour joker target');
+check(jokerDistanceTarget(10000,'next_run_150')===15000.0,'next run joker target');
+check(jokerMonth(new DateTimeImmutable('2026-10-31 23:30:00',$utc))['month']===11,'joker month uses Berlin time');
 $encode=static fn($v)=>rtrim(strtr(base64_encode($v),'+/','-_'),'=');
 $sub=['endpoint'=>'https://fcm.googleapis.com/fcm/send/example','keys'=>['p256dh'=>$encode(chr(4).str_repeat('x',64)),'auth'=>$encode(str_repeat('x',16))]];
 check(pushValidate($sub)['contentEncoding']==='aes128gcm','valid subscription');

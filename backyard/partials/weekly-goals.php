@@ -27,12 +27,14 @@ foreach($weeklyGoals as $goalRow) if((int)$goalRow['id']===(int)$u['id']) {$ownG
  <?php endforeach;?>
  </div>
  <?php if($weeklyGoalConfigure):?>
+ <?php if(!empty($weeklyGoalLocked)):?><p class="error">Ein Supporter-Joker hat dein Wochenziel um 20 % erhöht. Das Ziel ist deshalb bis zum Ende dieser Woche gesperrt.</p><?php else:?>
  <form method="post" class="weekly-goal-form"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="weekly_goal_save">
   <label>Mein Ziel<input type="number" name="goal_value" min="0.01" max="10080" step="0.01" required value="<?=h($ownGoal?(string)(float)$ownGoal['target_value']:'')?>" placeholder="z. B. 50"></label>
   <label>Einheit<select name="goal_unit" required><?php foreach(['km'=>'Kilometer','minutes'=>'Minuten','hours'=>'Stunden','loops'=>'Loops'] as $unit=>$label):?><option value="<?=h($unit)?>" <?=($ownGoal['unit']??'km')===$unit?'selected':''?>><?=h($label)?></option><?php endforeach;?></select></label>
   <button class="btn" type="submit">Wochenziel speichern</button>
  </form>
  <?php if($ownGoal):?><form method="post" class="weekly-goal-remove" onsubmit="return confirm('Wochenziel für diese Woche wirklich löschen?')"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="weekly_goal_delete"><button class="outline" type="submit">Mein Ziel löschen</button></form><?php endif;?>
+ <?php endif;?>
  <?php endif;?>
  <p class="team-disclaimer">Der Fortschritt basiert auf den aktuell synchronisierten Strava-Läufen im siebentägigen Cache. Ein Loop zählt nur, wenn 6,706 km innerhalb eines einzelnen Laufs vollständig erreicht wurden.</p>
  <?php endif;?>
