@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/supporter.php';
+require_once __DIR__.'/../partials/private-path.php';
+
+require_once lluPrivatePath('app/supporter.php');
 supporterSession(); $error=''; $username=''; $display='';
 $privacy=cfg('SUPPORTER_PRIVACY_URL'); $terms=cfg('SUPPORTER_TERMS_URL');
 if($_SERVER['REQUEST_METHOD']==='POST') {

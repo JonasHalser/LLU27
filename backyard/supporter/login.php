@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/supporter.php';
+require_once __DIR__.'/../partials/private-path.php';
+
+require_once lluPrivatePath('app/supporter.php');
 supporterSession(); $error='';
 if($_SERVER['REQUEST_METHOD']==='POST') try {
     verifyCsrf(); $name=strtolower(trim((string)($_POST['username']??'')));

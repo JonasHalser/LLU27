@@ -1,9 +1,11 @@
 <?php
 declare(strict_types=1);
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/bootstrap.php';
+require_once __DIR__.'/partials/private-path.php';
+
+require_once lluPrivatePath('app/bootstrap.php');
 $u=requireUser();
 if($_SERVER['REQUEST_METHOD']==='POST') {
-    require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/missions.php';
+    require_once lluPrivatePath('app/missions.php');
     try {
         verifyCsrf();
         if(($_POST['action']??'')!=='accept')throw new RuntimeException('Unbekannte Aktion.');

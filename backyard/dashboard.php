@@ -1,8 +1,10 @@
 <?php
 declare(strict_types=1);
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/bootstrap.php';
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/motivation.php';
-require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/weekly_goals.php';
+require_once __DIR__.'/partials/private-path.php';
+
+require_once lluPrivatePath('app/bootstrap.php');
+require_once lluPrivatePath('app/motivation.php');
+require_once lluPrivatePath('app/weekly_goals.php');
 $u=requireUser();
 db()->exec('DELETE FROM activities WHERE cache_updated_at < UTC_TIMESTAMP() - INTERVAL 7 DAY');
 $err='';
