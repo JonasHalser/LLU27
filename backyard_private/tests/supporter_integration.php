@@ -80,7 +80,7 @@ $old=$cookies['supporter']['llu27_supporter_session'];
 [$status]=request('supporter/login.php',['csrf'=>$csrf,'username'=>'new_support','password'=>'new-password-123','remember'=>1]);test($status===302,'login succeeds');
 test($old!==$cookies['supporter']['llu27_supporter_session'],'session rotation');
 test(isset($cookies['supporter']['llu27_supporter_remember']),'remember issued');
-[$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Anfeuern')&&str_contains($body,'href="cheers.php"'),'authenticated dashboard links to cheering page');
+[$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Anfeuern')&&str_contains($body,'supporter/cheers.php'),'authenticated dashboard links to cheering page');
 [$status,$body]=request('supporter/cheers.php');test($status===200&&str_contains($body,'Team anfeuern')&&str_contains($body,'Letzte Anfeuerungen'),'supporter cheering page');
 [$status,$body]=request('supporter/profile.php');test($status===200&&str_contains($body,'Push-Benachrichtigungen'),'supporter profile and push partial');
 [$status,$missionPage]=request('supporter/missions.php');test($status===200&&str_contains($missionPage,'Missionen vergeben')&&str_contains($missionPage,'value="exclusive"'),'supporter mission form');
