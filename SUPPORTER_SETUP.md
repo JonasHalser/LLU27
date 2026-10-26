@@ -14,10 +14,12 @@ Supporter-Missionen befinden sich ausschließlich auf den Unterseiten `/supporte
 
 Für den Fortschritt zählen nur synchronisierte Laufaktivitäten, die nach der individuellen Annahme beginnen und anhand ihrer Startzeit plus Bewegungszeit bis zur Frist abgeschlossen sind. Ein persistentes Missions-Ledger bewahrt bereits erkannte Beiträge über den siebentägigen Aktivitäts-Cache hinaus. Der reguläre Strava-Sync aktualisiert offene Missionen; ein Seitenaufruf prüft zusätzlich den aktuellen Cache. Missionspunkte werden nach Erreichen des Ziels dauerhaft in der separaten Missionsrangliste gewertet und verändern die bestehende Backyard-Challenge-Wertung nicht.
 
+Jeder Supporter erhält pro Berliner Kalendermonat genau einen Joker auf der Unterseite `/supporter/jokers.php`. Er kann das aktuelle persönliche Wochenziel eines Läufers um 20 Prozent erhöhen, innerhalb von 30 Stunden einen Lauf über mindestens 75 Prozent der bisherigen Durchschnittsdistanz verlangen oder den nächsten Lauf auf mindestens 150 Prozent der bisherigen Durchschnittsdistanz setzen. Die Berechnungsgrundlage wird beim Einsatz festgeschrieben. Ein Erfolg schützt nur die vorhandenen Missionspunkte; ein Fehlschlag zieht dauerhaft drei Punkte ab. Ungenutzte Monats-Joker werden nicht angespart und jede laufende Joker-Frist endet spätestens mit dem Berliner Monatswechsel. Wochenziele mit aktivem Joker können für die betroffene Woche nicht geändert oder gelöscht werden.
+
 ## Hostinger vorbereiten (manuell; kein Deployment wurde ausgeführt)
 
 1. Datenbank sichern. Auf Hostinger PHP **8.2 oder neuer** mit PDO MySQL, mbstring, curl und OpenSSL aktivieren. HTTPS ist erforderlich; Cookies sind ausschließlich `Secure`.
-2. In phpMyAdmin die Dateien `backyard_private/sql/20261024_supporter.sql`, `backyard_private/sql/20261026_weekly_goals.sql` und `backyard_private/sql/20261026_supporter_missions.sql` in derselben Datenbank wie `users` importieren. Sie sind wiederholbar, löschen keine Trainingsdaten und setzen die bestehende `users`-Tabelle voraus. Die Wochenziel-Migration ergänzt bei einer bereits installierten ersten Version die Serien-Spalten und legt das gemeinsame Teamziel an. Bei anderweitig angepassten Tabellen Spalten und Typen vorher mit den Migrationen vergleichen.
+2. In phpMyAdmin die Dateien `backyard_private/sql/20261024_supporter.sql`, `backyard_private/sql/20261026_weekly_goals.sql`, `backyard_private/sql/20261026_supporter_missions.sql` und `backyard_private/sql/20261026_supporter_jokers.sql` in derselben Datenbank wie `users` importieren. Sie sind wiederholbar, löschen keine Trainingsdaten und setzen die bestehende `users`-Tabelle voraus. Die Wochenziel-Migration ergänzt bei einer bereits installierten ersten Version die Serien-Spalten und legt das gemeinsame Teamziel an. Bei anderweitig angepassten Tabellen Spalten und Typen vorher mit den Migrationen vergleichen.
 3. Private Konfiguration in `domains/zjung-partyband.de/backyard_private/.env` ergänzen (siehe unten). Keine Secrets in öffentliche Verzeichnisse, Workflow-Inputs oder Repository schreiben.
 4. Composer-Pakete installieren: im lokalen/private Arbeitsverzeichnis `composer install --no-dev --prefer-dist --optimize-autoloader`. GitHub Actions installiert und überträgt `vendor/` jetzt in das **private** Verzeichnis. SQL wird weiterhin nicht automatisch ausgeführt. Das bestehende manuelle Deployment hat weiterhin `dry_run: true` als Standard. Erst selbst Dry-Run prüfen, anschließend ein gewünschtes Deployment gesondert auslösen.
 5. `APP_URL` muss die tatsächliche öffentliche Basis einschließlich Unterverzeichnis sein: `https://zjung-partyband.de/backyard`. Öffentliche Dateien liegen unter `public_html/backyard/`, private Dateien daneben unter `backyard_private/`. Nicht `backyard_private` unter `public_html` ablegen.
@@ -90,13 +92,15 @@ Live-Abnahme benötigt MySQL-Zugang, konfigurierte private `.env`, VAPID-Schlüs
 
 ## Dateien und Commit-Zusammenfassung
 
-Neu ist außerdem `.github/workflows/supporter-checks.yml` für Syntax-, Regel- und isolierte MySQL-/HTTP-Integrationstests. Der Workflow führt kein Deployment aus und wurde in dieser lokalen Sitzung nicht ausgelöst.
+Neu ist außerdem `.github/workflows/validate-changes.yml` für Syntax-, Regel- und isolierte MySQL-/HTTP-Integrationstests. Der Workflow führt kein Deployment aus und wurde in dieser lokalen Sitzung nicht ausgelöst.
 
 Geändert: `.gitignore`, `.github/workflows/deploy.yml`, `backyard/index.php`, `backyard/dashboard.php`, `backyard/challenge.php`, `backyard/manifest.webmanifest`.
 
 Neu: diese Anleitung; `backyard/supporter/{index,register,login,logout,profile,push,moderation}.php`, `backyard/supporter/{supporter.css,supporter.js,manifest.webmanifest}`, `backyard/assets/supporter-push.js`, `backyard/sw.js`, `backyard/partials/{supporter-runner,supporter-push}.php`, `backyard_private/app/{supporter,push,challenge_score}.php`, `backyard_private/bin/supporter_push.php`, `backyard_private/sql/20261024_supporter.sql`, `backyard_private/composer.json`, `backyard_private/tests/supporter_test.php` und `backyard_private/tests/supporter_integration.php`.
 
 Für die spätere Missionserweiterung kamen `backyard/missions.php`, `backyard/supporter/missions.php`, `backyard/partials/mission-card.php`, `backyard/assets/missions.css`, `backyard_private/app/missions.php` und `backyard_private/sql/20261026_supporter_missions.sql` hinzu.
+
+Für die Monats-Joker kamen `backyard/jokers.php`, `backyard/supporter/jokers.php`, `backyard/partials/joker-card.php`, `backyard_private/app/jokers.php` und `backyard_private/sql/20261026_supporter_jokers.sql` hinzu.
 
 Vorgeschlagener Commit: `feat: add secure supporter zone with cheers, weekly predictions and web push`.
 

@@ -2,16 +2,19 @@
 declare(strict_types=1);
 require_once dirname(__DIR__,2).'/backyard_private/app/bootstrap.php';
 require_once dirname(__DIR__,2).'/backyard_private/app/weekly_goals.php';
+require_once dirname(__DIR__,2).'/backyard_private/app/jokers.php';
 $u=requireUser();
 $goalPeriod=weeklyGoalPeriod();
-$err='';
+$err='';$weeklyGoalLocked=false;
 
 if($_SERVER['REQUEST_METHOD']==='POST') try {
     verifyCsrf();
     $action=(string)($_POST['action']??'');
     if($action==='weekly_goal_save') {
+        jokerAssertWeeklyGoalEditable((int)$u['id'],$goalPeriod);
         weeklyGoalSave((int)$u['id'],$goalPeriod,weeklyGoalInput((string)($_POST['goal_unit']??''),(string)($_POST['goal_value']??'')));
     } elseif($action==='weekly_goal_delete') {
+        jokerAssertWeeklyGoalEditable((int)$u['id'],$goalPeriod);
         weeklyGoalDelete((int)$u['id'],$goalPeriod);
     } elseif($action==='team_goal_save') {
         teamWeeklyGoalSave((int)$u['id'],$goalPeriod,weeklyGoalInput((string)($_POST['goal_unit']??''),(string)($_POST['goal_value']??'')));
@@ -27,6 +30,8 @@ if($_SERVER['REQUEST_METHOD']==='POST') try {
 
 $weeklyGoals=[];$weeklyGoalStreaks=[];$teamWeeklyGoal=null;$weeklyGoalError='';
 try {
+    jokerRefreshAll();
+    $weeklyGoalLocked=jokerWeeklyGoalLocked((int)$u['id'],$goalPeriod);
     $weeklyGoals=weeklyGoalTeam($goalPeriod);
     $weeklyGoalStreaks=weeklyGoalStreaks($goalPeriod);
     $teamWeeklyGoal=teamWeeklyGoal($goalPeriod,$weeklyGoals);

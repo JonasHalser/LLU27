@@ -137,10 +137,12 @@ function missionPointsBoard(bool $supporterView=false): array {
     $display=$supporterView?"IF(s.runner_id IS NULL,CONCAT(UPPER(LEFT(u.username,1)),SUBSTRING(u.username,2)),u.display_name)":"u.display_name";
     $sharing=$supporterView?' LEFT JOIN supporter_sharing s ON s.runner_id=u.id ':'';
     $group=$supporterView?'u.id,u.username,u.display_name,s.runner_id':'u.id,u.username,u.display_name';
-    return db()->query("SELECT u.id,u.username,$display display_name,COALESCE(SUM(CASE WHEN e.completed_at IS NOT NULL THEN m.points ELSE 0 END),0) points,
-        SUM(CASE WHEN e.completed_at IS NOT NULL THEN 1 ELSE 0 END) completed
-        FROM users u $sharing LEFT JOIN supporter_mission_entries e ON e.runner_id=u.id LEFT JOIN supporter_missions m ON m.id=e.mission_id
-        WHERE u.username IN ('tim','jonas','noah') GROUP BY $group ORDER BY points DESC,completed DESC,FIELD(u.username,'tim','jonas','noah')")->fetchAll();
+    return db()->query("SELECT u.id,u.username,$display display_name,CAST(COALESCE(mp.points,0) AS SIGNED)-CAST(COALESCE(jp.penalties,0) AS SIGNED) points,
+        COALESCE(mp.completed,0) completed,COALESCE(jp.failed,0) failed_jokers,COALESCE(jp.penalties,0) penalties
+        FROM users u $sharing
+        LEFT JOIN (SELECT e.runner_id,SUM(m.points) points,COUNT(*) completed FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id WHERE e.completed_at IS NOT NULL GROUP BY e.runner_id) mp ON mp.runner_id=u.id
+        LEFT JOIN (SELECT runner_id,SUM(penalty_points) penalties,COUNT(*) failed FROM supporter_jokers WHERE status='failed' GROUP BY runner_id) jp ON jp.runner_id=u.id
+        WHERE u.username IN ('tim','jonas','noah') GROUP BY $group,mp.points,mp.completed,jp.penalties,jp.failed ORDER BY points DESC,completed DESC,FIELD(u.username,'tim','jonas','noah')")->fetchAll();
 }
 
 function missionValue(float $value,string $unit): string {
