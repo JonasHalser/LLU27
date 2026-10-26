@@ -83,9 +83,15 @@
 .supporter-layout .mission-bet-row form button { padding: 9px 12px; }
 .supporter-layout .bet-mission { margin: 15px 0 6px; }
 .supporter-layout .supporter-winners { display: grid; gap: 10px; }
-.supporter-layout .supporter-winner { display: grid; grid-template-columns: 1fr auto; gap: 2px 15px; align-items: baseline; padding: 13px 15px; border: 1px solid #344457; border-radius: 11px; background: #111d2b; }
-.supporter-layout .supporter-winner strong { color: #ffcf7a; }
-.supporter-layout .supporter-winner small { grid-column: 1/-1; }
+.supporter-layout .supporter-winner { display: grid; gap: 8px; padding: 13px 15px; border: 1px solid #344457; border-radius: 11px; background: #111d2b; }
+.supporter-layout .supporter-winner.is-leader { border-color: #715027; background: linear-gradient(120deg,#2c271f,#111d2b 68%); }
+.supporter-layout .supporter-winner-title { display: grid; grid-template-columns: 38px minmax(0,1fr) auto; gap: 10px; align-items: baseline; }
+.supporter-layout .supporter-rank { color: #aebdcc; font-weight: 850; }
+.supporter-layout .supporter-winner-title strong { color: #f4f7fa; }
+.supporter-layout .supporter-winner-title b { color: #ffcf7a; white-space: nowrap; }
+.supporter-layout .supporter-winner-track { height: 10px; overflow: hidden; border-radius: 999px; background: #2c3b4c; }
+.supporter-layout .supporter-winner-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg,#fc4c02,#ffbd69); transition: width .35s ease; }
+.supporter-layout .supporter-winner small { color: var(--support-muted); }
 .supporter-layout .bet-live { margin: 10px 0; padding: 13px; border: 1px solid #35485c; border-radius: 11px; background: #0f1b29; }
 .supporter-layout .bet-live-head,.supporter-layout .bet-live-option-label,.supporter-layout .custom-market-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 .supporter-layout .bet-live-head strong { color: #ffcf7a; }
@@ -116,7 +122,8 @@
   .supporter-layout .score-row { grid-template-columns: 1fr; }
   .supporter-layout .coin-pool-list { grid-template-columns: 1fr; }
   .supporter-layout .mission-bet-row { grid-template-columns: 1fr; }
-  .supporter-layout .supporter-winner { grid-template-columns: 1fr; }
+  .supporter-layout .supporter-winner-title { grid-template-columns: 30px minmax(0,1fr); }
+  .supporter-layout .supporter-winner-title b { grid-column: 2; }
   .supporter-layout .custom-market-form { grid-template-columns: 1fr; }
   .supporter-layout .custom-market-head { align-items: flex-start; flex-direction: column; }
 }

@@ -117,6 +117,7 @@ function supporterHead(string $title,?array $u=null): void {
     $current=basename((string)($_SERVER['SCRIPT_NAME']??''));
     $links=$u?[
         ['index.php','Übersicht','▦'],
+        ['cheers.php','Anfeuern','♡'],
         ['bets.php','Wetten','◈'],
         ['missions.php','Missionen','◆'],
         ['jokers.php','Joker','!'],

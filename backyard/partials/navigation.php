@@ -4,6 +4,7 @@
 $lluPage = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
 $lluLinks = [
   ['dashboard.php', 'Dashboard', '▦'],
+  ['cheers.php', 'Anfeuern', '♡'],
   ['weekly-goals.php', 'Wochenziele', '◎'],
   ['performance.php', 'Performance', '↗'],
   ['competition.php', 'Wettkampf', '★'],
