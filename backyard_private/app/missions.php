@@ -100,10 +100,10 @@ function missionRefreshRunner(int $runnerId): void {
         WHERE e.runner_id=? AND e.completed_at IS NULL AND m.cancelled_at IS NULL AND m.deadline_at>=UTC_TIMESTAMP()-INTERVAL 8 DAY
         GROUP BY e.mission_id,e.runner_id,m.unit,m.target_value");
     $q->execute([$runnerId]);
-    $save=$p->prepare('UPDATE supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id SET e.progress_value=?,e.completed_at=IF(? >= ?,UTC_TIMESTAMP(),e.completed_at) WHERE e.mission_id=? AND e.runner_id=? AND m.cancelled_at IS NULL');
+    $save=$p->prepare('UPDATE supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id SET e.progress_value=CAST(? AS DECIMAL(12,2)),e.completed_at=IF(CAST(? AS DECIMAL(12,2))>=m.target_value,UTC_TIMESTAMP(),e.completed_at) WHERE e.mission_id=? AND e.runner_id=? AND m.cancelled_at IS NULL');
     foreach($q->fetchAll() as $row) {
         $progress=round((float)$row['progress'],2);
-        $save->execute([$progress,$progress,(float)$row['target_value'],(int)$row['mission_id'],$runnerId]);
+        $save->execute([$progress,$progress,(int)$row['mission_id'],$runnerId]);
     }
 }
 
