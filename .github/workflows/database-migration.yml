@@ -1,0 +1,193 @@
+name: LLU27 SQL-Migration ausführen
+
+on:
+  workflow_dispatch:
+    inputs:
+      sql_file:
+        description: "Dateiname aus backyard_private/sql, z. B. 20261026_weekly_goals.sql"
+        required: true
+        default: "20261026_weekly_goals.sql"
+        type: string
+      confirmation:
+        description: "Zur Bestätigung exakt APPLY eingeben"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llu27-production-database
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: SQL mit vorherigem Backup anwenden
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Eingaben absichern
+        id: migration
+        env:
+          SQL_FILE: ${{ inputs.sql_file }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Migrationen dürfen ausschließlich vom main-Branch gestartet werden." >&2
+            exit 1
+          fi
+
+          if [ "$CONFIRMATION" != "APPLY" ]; then
+            echo "Bestätigung fehlt: Bitte exakt APPLY eingeben." >&2
+            exit 1
+          fi
+
+          if [[ ! "$SQL_FILE" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.sql$ ]]; then
+            echo "Ungültiger SQL-Dateiname." >&2
+            exit 1
+          fi
+
+          SQL_PATH="backyard_private/sql/$SQL_FILE"
+          test -f "$SQL_PATH"
+          git ls-files --error-unmatch -- "$SQL_PATH" >/dev/null
+
+          echo "sql_file=$SQL_FILE" >> "$GITHUB_OUTPUT"
+          echo "sql_path=$SQL_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: SSH vorbereiten
+        env:
+          DEPLOY_KEY: ${{ secrets.HOSTINGER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.HOSTINGER_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_KEY"
+          test -n "$KNOWN_HOSTS"
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Server und Werkzeuge prüfen
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_USER }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/id_ed25519 \
+            -p "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            'test -f domains/zjung-partyband.de/backyard_private/.env &&
+             test -f domains/zjung-partyband.de/backyard_private/app/bootstrap.php &&
+             command -v php && command -v mysql && command -v mysqldump'
+
+      - name: Ausgewählte SQL-Datei übertragen
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_USER }}
+          SQL_PATH: ${{ steps.migration.outputs.sql_path }}
+        run: |
+          set -euo pipefail
+          REMOTE_SQL="domains/zjung-partyband.de/backyard_private/.migration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
+          scp -i ~/.ssh/id_ed25519 \
+            -P "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$SQL_PATH" \
+            "$SSH_USER@$SSH_HOST:$REMOTE_SQL"
+
+      - name: Backup erstellen und Migration anwenden
+        env:
+          SSH_HOST: ${{ secrets.HOSTINGER_HOST }}
+          SSH_PORT: ${{ secrets.HOSTINGER_PORT }}
+          SSH_USER: ${{ secrets.HOSTINGER_USER }}
+          SQL_FILE: ${{ steps.migration.outputs.sql_file }}
+        run: |
+          set -euo pipefail
+          REMOTE_SQL="domains/zjung-partyband.de/backyard_private/.migration-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.sql"
+
+          ssh -i ~/.ssh/id_ed25519 \
+            -p "$SSH_PORT" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$SSH_USER@$SSH_HOST" \
+            bash -s -- "$REMOTE_SQL" "$SQL_FILE" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          REMOTE_SQL="$1"
+          SQL_FILE="$2"
+          BASE="$HOME/domains/zjung-partyband.de"
+          PRIVATE_DIR="$BASE/backyard_private"
+          cleanup() { rm -f "$HOME/$REMOTE_SQL"; }
+          trap cleanup EXIT
+
+          cd "$PRIVATE_DIR"
+          read_cfg() {
+            php -r 'require "app/bootstrap.php"; echo cfg($argv[1], $argv[2] ?? "");' "$1" "${2:-}"
+          }
+
+          DB_HOST="$(read_cfg DB_HOST localhost)"
+          DB_PORT="$(read_cfg DB_PORT 3306)"
+          DB_NAME="$(read_cfg DB_NAME)"
+          DB_USER="$(read_cfg DB_USER)"
+          DB_PASS="$(read_cfg DB_PASS)"
+          test -n "$DB_NAME"
+          test -n "$DB_USER"
+
+          BACKUP_DIR="$PRIVATE_DIR/backups"
+          mkdir -p "$BACKUP_DIR"
+          chmod 700 "$BACKUP_DIR"
+          BACKUP_FILE="$BACKUP_DIR/$(date -u +%Y%m%dT%H%M%SZ)-before-${SQL_FILE%.sql}.sql"
+
+          DUMP_OPTIONS=(
+            --host="$DB_HOST"
+            --port="$DB_PORT"
+            --user="$DB_USER"
+            --default-character-set=utf8mb4
+            --single-transaction
+            --quick
+            --skip-lock-tables
+          )
+          if mysqldump --help 2>/dev/null | grep -q -- '--no-tablespaces'; then
+            DUMP_OPTIONS+=(--no-tablespaces)
+          fi
+          MYSQL_PWD="$DB_PASS" mysqldump "${DUMP_OPTIONS[@]}" "$DB_NAME" > "$BACKUP_FILE"
+          chmod 600 "$BACKUP_FILE"
+          test -s "$BACKUP_FILE"
+
+          MYSQL_PWD="$DB_PASS" mysql \
+            --host="$DB_HOST" \
+            --port="$DB_PORT" \
+            --user="$DB_USER" \
+            --default-character-set=utf8mb4 \
+            --show-warnings \
+            "$DB_NAME" < "$HOME/$REMOTE_SQL"
+
+          echo "Migration erfolgreich: $SQL_FILE"
+          echo "Backup erstellt: $BACKUP_FILE"
+          REMOTE_SCRIPT
+
+      - name: Zusammenfassung
+        env:
+          SQL_FILE: ${{ steps.migration.outputs.sql_file }}
+        run: |
+          {
+            echo "### SQL-Migration erfolgreich"
+            echo
+            echo "Ausgeführt: \`$SQL_FILE\`"
+            echo
+            echo "Vor der Migration wurde auf dem Server ein privates Datenbank-Backup erstellt."
+          } >> "$GITHUB_STEP_SUMMARY"

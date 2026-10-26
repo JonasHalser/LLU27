@@ -63,6 +63,10 @@ Anfeuerungen und Anzeigenamen sind für angemeldete Supporter sichtbar, der High
 
 ## Tests und Abnahme
 
+### SQL-Migration über GitHub Actions
+
+Der Workflow **LLU27 SQL-Migration ausführen** kann eine versionierte Datei aus `backyard_private/sql/` auf der Produktionsdatenbank anwenden. Unter **Actions → LLU27 SQL-Migration ausführen → Run workflow** muss `main` gewählt, der exakte Dateiname eingetragen und mit `APPLY` bestätigt werden. Der Workflow verwendet dieselben Hostinger-SSH-Secrets wie das Deployment, liest die Datenbankwerte erst auf dem Server aus der privaten `.env` und erstellt vor jeder Ausführung ein Backup unter `backyard_private/backups/`. Freier SQL-Text und Pfade außerhalb des SQL-Verzeichnisses werden abgelehnt.
+
 Automatisierter Regeltest: `php backyard_private/tests/supporter_test.php` (mbstring erforderlich). PHP-Syntaxprüfung: alle PHP-Dateien in `backyard/` und `backyard_private/`, ohne `vendor/`, mit `php -l` prüfen. Der Deployment-Workflow prüft ebenfalls alle öffentlichen PHP-Dateien und private App-/Bin-Dateien.
 
 Staging-Abnahme mit eigener Datenbank und HTTPS:
