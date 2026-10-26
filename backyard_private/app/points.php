@@ -52,7 +52,7 @@ function teamPointsTimeline(array $challengeScore): array {
     }
 
     try {
-        $missions=db()->query("SELECT u.username,e.completed_at,m.points FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id JOIN users u ON u.id=e.runner_id WHERE e.completed_at IS NOT NULL AND u.username IN ('tim','jonas','noah') AND (m.acceptance_mode='exclusive' OR (SELECT COUNT(*) FROM supporter_mission_entries team_entries WHERE team_entries.mission_id=m.id)>=2)")->fetchAll();
+        $missions=db()->query("SELECT u.username,e.completed_at,m.points FROM supporter_mission_entries e JOIN supporter_missions m ON m.id=e.mission_id JOIN users u ON u.id=e.runner_id WHERE e.completed_at IS NOT NULL AND u.username IN ('tim','jonas','noah')")->fetchAll();
         foreach($missions as $row) {
             $key=(new DateTimeImmutable((string)$row['completed_at'],new DateTimeZone('UTC')))->format('o-\\WW');
             $username=(string)$row['username'];

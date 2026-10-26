@@ -137,7 +137,6 @@ function supporterCoinSettleMissionDue(): void {
     foreach($markets as $market){
         if($market['cancelled_at']!==null){supporterCoinSettle($market,'',true);continue;}
         $q=db()->prepare('SELECT accepted_at,completed_at FROM supporter_mission_entries WHERE mission_id=? AND runner_id=?');$q->execute([$market['reference_id'],$market['subject_id']]);$entry=$q->fetch();$accepted=$entry!==false;$completed=$accepted&&$entry['completed_at']!==null;
-        if($market['market_type']==='mission_complete'&&$completed&&$market['acceptance_mode']==='all'){$q=db()->prepare('SELECT COUNT(*) FROM supporter_mission_entries WHERE mission_id=?');$q->execute([$market['reference_id']]);$completed=(int)$q->fetchColumn()>=2;}
         if($market['market_type']==='mission_accept'&&$accepted){supporterCoinSettle($market,'yes');continue;}
         if($market['market_type']==='mission_complete'&&$completed){supporterCoinSettle($market,'yes');continue;}
         if(strtotime($market['deadline_at'].' UTC')<=time())supporterCoinSettle($market,'no');

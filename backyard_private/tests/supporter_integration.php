@@ -80,7 +80,8 @@ $old=$cookies['supporter']['llu27_supporter_session'];
 [$status]=request('supporter/login.php',['csrf'=>$csrf,'username'=>'new_support','password'=>'new-password-123','remember'=>1]);test($status===302,'login succeeds');
 test($old!==$cookies['supporter']['llu27_supporter_session'],'session rotation');
 test(isset($cookies['supporter']['llu27_supporter_remember']),'remember issued');
-[$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Anfeuern'),'authenticated dashboard');
+[$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Anfeuern')&&str_contains($body,'href="cheers.php"'),'authenticated dashboard links to cheering page');
+[$status,$body]=request('supporter/cheers.php');test($status===200&&str_contains($body,'Team anfeuern')&&str_contains($body,'Letzte Anfeuerungen'),'supporter cheering page');
 [$status,$body]=request('supporter/profile.php');test($status===200&&str_contains($body,'Push-Benachrichtigungen'),'supporter profile and push partial');
 [$status,$missionPage]=request('supporter/missions.php');test($status===200&&str_contains($missionPage,'Missionen vergeben')&&str_contains($missionPage,'value="exclusive"'),'supporter mission form');
 $missionCsrf=token($missionPage);$missionDeadline=(new DateTimeImmutable('+3 days',new DateTimeZone('Europe/Berlin')))->setTime(23,0)->format('Y-m-d\TH:i');
@@ -133,7 +134,6 @@ $timeMission=(int)$p->query("SELECT id FROM supporter_missions WHERE title='60 M
 [$status,$runner2Missions]=request('competition.php',null,'runner2');$runner2Csrf=token($runner2Missions);
 [$status,$blocked]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$exclusiveMission],'runner2');test($status===200&&str_contains($blocked,'bereits von einem anderen Läufer angenommen'),'exclusive mission blocks second runner');
 [$status]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$openMission],'runner2');test($status===302,'second runner accepts open mission');
-[$status]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$timeMission],'runner2');test($status===302,'second runner accepts time mission');
 $p->exec('UPDATE supporter_mission_entries SET accepted_at=UTC_TIMESTAMP()-INTERVAL 3 HOUR');
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 2 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99002,$runner,'Mission test',21000,7200]);
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 1 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99003,(int)$team[1]['id'],'Open mission test',7000,3000]);
@@ -162,7 +162,7 @@ $missionPoints=missionPointsBoard();$pointsByRunner=array_column($missionPoints,
 [$status]=request('performance.php');test($status===200,'runner performance');
 [$status,$body]=request('supporter/index.php');test($status===200&&str_contains($body,'Hallo New'),'supporter session independent');
 test(isset($cookies['supporter']['backyard_session'])&&isset($cookies['supporter']['llu27_supporter_session']),'separate session cookies');
-[$status,$body]=request('supporter/index.php',['csrf'=>'bad','action'=>'cheer','runner'=>$runner,'message'=>'no']);test(str_contains($body,'Formularanfrage'),'CSRF protection');
+[$status,$body]=request('supporter/cheers.php',['csrf'=>'bad','action'=>'cheer','runner'=>$runner,'message'=>'no']);test(str_contains($body,'Formularanfrage'),'CSRF protection');
 $remember=$cookies['supporter']['llu27_supporter_remember'];
 $cookies['restore']=['llu27_supporter_remember'=>$remember];
 [$status]=request('supporter/index.php',null,'restore');test($status===200,'remember restoration');
