@@ -44,6 +44,10 @@ jobs:
         run: |
           set -euo pipefail
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/schema.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_heart_rate_sharing.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_heart_rate_sharing.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_performance_cache.sql
+          mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261026_performance_cache.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/remember_tokens.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261024_supporter.sql
           mysql -h127.0.0.1 -uroot llu27_test < backyard_private/sql/20261024_supporter.sql
