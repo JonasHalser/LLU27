@@ -134,6 +134,7 @@ $timeMission=(int)$p->query("SELECT id FROM supporter_missions WHERE title='60 M
 [$status,$runner2Missions]=request('competition.php',null,'runner2');$runner2Csrf=token($runner2Missions);
 [$status,$blocked]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$exclusiveMission],'runner2');test($status===200&&str_contains($blocked,'bereits von einem anderen Läufer angenommen'),'exclusive mission blocks second runner');
 [$status]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$openMission],'runner2');test($status===302,'second runner accepts open mission');
+[$status]=request('competition.php',['csrf'=>$runner2Csrf,'action'=>'accept','mission_id'=>$timeMission],'runner2');test($status===302,'second runner accepts time mission');
 $p->exec('UPDATE supporter_mission_entries SET accepted_at=UTC_TIMESTAMP()-INTERVAL 3 HOUR');
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 2 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99002,$runner,'Mission test',21000,7200]);
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,UTC_TIMESTAMP()-INTERVAL 1 HOUR,?,?,0,UTC_TIMESTAMP())')->execute([99003,(int)$team[1]['id'],'Open mission test',7000,3000]);
