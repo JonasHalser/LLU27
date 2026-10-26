@@ -98,6 +98,30 @@ td { border-bottom: 1px solid #273342; }
 .team-meta { font-size: 11px; color: #aebdcc; margin-top: 7px; flex-wrap: wrap; }
 .team-disclaimer { font-size: 11px; line-height: 1.5; color: #9dadbd; border-top: 1px solid #314154; padding-top: 12px; margin: 20px 0 0; }
 
+/* Persönliche Wochenziele */
+.weekly-goal-panel { scroll-margin-top: 24px; }
+.weekly-goal-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.weekly-goal-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; margin: 20px 0; }
+.weekly-goal-card { --person: #fc4c02; background: #111d2b; border: 1px solid #344457; border-radius: 14px; padding: 17px; min-width: 0; }
+.weekly-goal-card.team-jonas { --person: #2dd4bf; }
+.weekly-goal-card.team-noah { --person: #a5a0ff; }
+.weekly-goal-card h3 { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; margin: 0 0 10px; color: var(--person); }
+.weekly-goal-card strong { display: block; font-size: 21px; }
+.weekly-goal-card progress,.team-goal-progress progress { display: block; width: 100%; height: 12px; margin: 12px 0 7px; accent-color: var(--person,#fc4c02); }
+.weekly-goal-card p { font-size: 12px; color: #aebdcc; margin: 5px 0; }
+.goal-streak { color: #ffc76b !important; font-weight: 700; }
+.team-goal { margin: 20px 0; padding: 20px; border: 1px solid #4a5d72; border-radius: 16px; background: linear-gradient(135deg,#132337,#1b2d3e); }
+.team-goal-top { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+.team-goal h3 { margin: 0 0 5px; font-size: 20px; }
+.team-goal-progress { min-width: min(100%,360px); flex: 1; }
+.team-goal-progress strong { font-size: 24px; }
+.weekly-goal-form { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; border-top: 1px solid #344457; padding-top: 18px; }
+.weekly-goal-form label { font-size: 12px; color: #aebdcc; }
+.weekly-goal-form input,.weekly-goal-form select { display: block; margin-top: 5px; background: #101c29; border: 1px solid #435266; border-radius: 8px; color: #fff; padding: 10px; font: inherit; }
+.weekly-goal-form input { width: 150px; }
+.weekly-goal-remove { margin-top: 10px; }
+.weekly-goal-empty { color: #8393a4; font-size: 13px; }
+
 @media(max-width:850px) {
   .stats { grid-template-columns: repeat(2,1fr); }
   .charts { grid-template-columns: 1fr; }
@@ -107,6 +131,7 @@ td { border-bottom: 1px solid #273342; }
   .llu-hero { padding: 24px; min-height: 0; }
   .llu-hero .pill { margin-top: 7px; }
   .brand-caption { display: none; }
+  .weekly-goal-grid { grid-template-columns: 1fr; }
 }
 @media(max-width:520px) {
   .team-total { text-align: left; }

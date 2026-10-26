@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once dirname(__DIR__).'/app/supporter.php';
 require_once dirname(__DIR__).'/app/push.php';
+require_once dirname(__DIR__).'/app/weekly_goals.php';
 $checks=0;
 function check(bool $condition,string $name): void { global $checks; if(!$condition) throw new RuntimeException('FAIL: '.$name); $checks++; }
 function rejects(callable $f,string $name): void { try { $f(); } catch(RuntimeException $e) { check(true,$name); return; } check(false,$name); }
@@ -34,6 +35,27 @@ $utc=new DateTimeZone('UTC');
 check(supporterWeek(new DateTimeImmutable('2026-10-19 17:59:59',$utc))['open'],'before cutoff');
 check(!supporterWeek(new DateTimeImmutable('2026-10-19 18:00:00',$utc))['open'],'exact cutoff');
 check(supporterWeek(new DateTimeImmutable('2027-01-01',$utc))['year']===2026,'ISO year boundary');
+$goal=weeklyGoalInput('km','42,5');
+check($goal===['unit'=>'km','target'=>42.5],'weekly goal comma input');
+check(weeklyGoalInput('hours','3.5')['target']===3.5,'weekly goal hours');
+rejects(fn()=>weeklyGoalInput('loops','2.5'),'weekly goal whole loops');
+rejects(fn()=>weeklyGoalInput('minutes','30.5'),'weekly goal whole minutes');
+rejects(fn()=>weeklyGoalInput('km','0'),'weekly goal positive');
+rejects(fn()=>weeklyGoalInput('days','4'),'weekly goal unit allowlist');
+check(weeklyGoalProgress(['unit'=>'km','distance_m'=>12500])===12.5,'weekly goal distance progress');
+check(weeklyGoalProgress(['unit'=>'hours','moving_seconds'=>5400])===1.5,'weekly goal time progress');
+check(weeklyGoalProgress(['unit'=>'loops','completed_loops'=>3])===3.0,'weekly goal loop progress');
+check(weeklyGoalPeriod(new DateTimeImmutable('2027-01-01 12:00:00',$utc))['year']===2026,'weekly goal ISO year boundary');
+$streakPeriod=weeklyGoalPeriod(new DateTimeImmutable('2026-10-22 12:00:00',$utc));
+$streakRows=[
+ ['iso_year'=>2026,'iso_week'=>40,'achieved_at'=>'2026-10-04 12:00:00'],
+ ['iso_year'=>2026,'iso_week'=>41,'achieved_at'=>'2026-10-11 12:00:00'],
+ ['iso_year'=>2026,'iso_week'=>42,'achieved_at'=>'2026-10-18 12:00:00'],
+ ['iso_year'=>2026,'iso_week'=>43,'achieved_at'=>null],
+];
+check(weeklyGoalStreakStats($streakRows,$streakPeriod)===['current'=>3,'best'=>3],'weekly goal current streak skips open week');
+$streakRows[2]['achieved_at']=null;
+check(weeklyGoalStreakStats($streakRows,$streakPeriod)===['current'=>0,'best'=>2],'weekly goal streak breaks on missed goal');
 $encode=static fn($v)=>rtrim(strtr(base64_encode($v),'+/','-_'),'=');
 $sub=['endpoint'=>'https://fcm.googleapis.com/fcm/send/example','keys'=>['p256dh'=>$encode(chr(4).str_repeat('x',64)),'auth'=>$encode(str_repeat('x',16))]];
 check(pushValidate($sub)['contentEncoding']==='aes128gcm','valid subscription');
