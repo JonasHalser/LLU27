@@ -8,7 +8,7 @@ Wochentipps schließen **Montag 18:00 UTC** (20:00 Uhr MESZ / 19:00 Uhr MEZ). Ei
 
 Kilometer und Läufe sind Cache-Summen ab persönlichem Trainingsstart, kein Langzeitarchiv. Ein Loop ist die Summe der je Aktivität abgerundeten vollständigen 6.706 Meter. Fortschrittsbalken vergleichen verfügbare Kilometer im Team und sind keine medizinische oder Zielprognose. Challenge-Historie kommt aus `challenge_weekly`.
 
-Persönliche Wochenziele und das gemeinsame Teamziel verwenden dieselbe UTC-Kalenderwoche wie die Challenge. Jeder Läufer kann sein eigenes Ziel und das gemeinsame Teamziel konfigurieren. Erreichte persönliche Ziele werden dauerhaft markiert, damit aktuelle und beste Zielserien trotz des siebentägigen Aktivitäts-Caches erhalten bleiben. Der reguläre Sync aktualisiert den Stand der aktuellen und vorherigen Woche automatisch.
+Persönliche Wochenziele und das gemeinsame Teamziel verwenden dieselbe UTC-Kalenderwoche wie die Challenge. Jeder Läufer kann sein eigenes Ziel und das gemeinsame Teamziel auf der Navigationsseite `Wochenziele` konfigurieren; das Dashboard zeigt nur die aktuellen Fortschritte. Erreichte persönliche Ziele werden dauerhaft markiert, damit aktuelle und beste Zielserien trotz des siebentägigen Aktivitäts-Caches erhalten bleiben. Der reguläre Sync aktualisiert den Stand der aktuellen und vorherigen Woche automatisch.
 
 ## Hostinger vorbereiten (manuell; kein Deployment wurde ausgeführt)
 

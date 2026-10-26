@@ -83,8 +83,11 @@ test(isset($cookies['supporter']['llu27_supporter_remember']),'remember issued')
 [$status]=request('index.php',['csrf'=>$runnerCsrf,'username'=>'tim','password'=>'runner-password']);test($status===302,'runner login while supporter logged in');
 [$status,$body]=request('dashboard.php');
 test($status===200&&substr_count(strtolower($body),'<!doctype html>')===1&&str_contains($body,'Letzte Läufe im Team'),'runner dashboard renders completely');
-$goalCsrf=token($body);$period=weeklyGoalPeriod();weeklyGoalSave((int)$team[1]['id'],$period,['unit'=>'loops','target'=>4]);
-[$status]=request('dashboard.php',['csrf'=>$goalCsrf,'action'=>'weekly_goal_save','goal_unit'=>'hours','goal_value'=>'3.5']);test($status===302,'weekly goal saved');
+test(str_contains($body,'href="weekly-goals.php"')&&!str_contains($body,'value="weekly_goal_save"')&&!str_contains($body,'value="team_goal_save"')&&!str_contains($body,'Wochenziele konfigurieren'),'dashboard weekly goals are read only');
+[$status,$goalPage]=request('weekly-goals.php');
+test($status===200&&str_contains($goalPage,'value="weekly_goal_save"')&&str_contains($goalPage,'value="team_goal_save"'),'weekly goal settings page');
+$goalCsrf=token($goalPage);$period=weeklyGoalPeriod();weeklyGoalSave((int)$team[1]['id'],$period,['unit'=>'loops','target'=>4]);
+[$status]=request('weekly-goals.php',['csrf'=>$goalCsrf,'action'=>'weekly_goal_save','goal_unit'=>'hours','goal_value'=>'3.5']);test($status===302,'weekly goal saved');
 test((int)$p->query('SELECT COUNT(*) FROM weekly_goals')->fetchColumn()===2,'team weekly goals persisted');
 $p->prepare('INSERT INTO activities(id,user_id,name,activity_date,distance_m,moving_seconds,elevation_m,cache_updated_at) VALUES(?,?,?,?,?,?,0,UTC_TIMESTAMP())')->execute([99001,$runner,'Goal test',$period['start']->modify('+1 day')->format('Y-m-d H:i:s'),12000,14400]);
 [$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'Wochenziele im Team')&&str_contains($body,'3,5 Std.')&&str_contains($body,'4 Loops'),'team weekly goals visible');
@@ -92,8 +95,8 @@ test((bool)$p->query('SELECT achieved_at FROM weekly_goals WHERE user_id='.$runn
 $history=$p->prepare('INSERT INTO weekly_goals(user_id,iso_year,iso_week,unit,target_value,progress_value,achieved_at,updated_at) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP())');
 foreach([-1,-2] as $offset){$past=weeklyGoalPeriod($period['start']->modify($offset.' week'));$history->execute([$runner,$past['year'],$past['week'],'km',10,10]);}
 [$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'3 Wochen in Folge'),'weekly goal streak visible');
-$teamCsrf=token($body);
-[$status]=request('dashboard.php',['csrf'=>$teamCsrf,'action'=>'team_goal_save','goal_unit'=>'km','goal_value'=>'100']);test($status===302,'team goal saved');
+[$status,$goalPage]=request('weekly-goals.php');$teamCsrf=token($goalPage);
+[$status]=request('weekly-goals.php',['csrf'=>$teamCsrf,'action'=>'team_goal_save','goal_unit'=>'km','goal_value'=>'100']);test($status===302,'team goal saved');
 test((int)$p->query('SELECT COUNT(*) FROM team_weekly_goals')->fetchColumn()===1,'team goal persisted');
 [$status,$body]=request('dashboard.php');test($status===200&&str_contains($body,'GEMEINSAME MISSION')&&str_contains($body,'100,0 km'),'team goal visible');
 test((float)$p->query('SELECT progress_value FROM team_weekly_goals')->fetchColumn()===12.0,'team goal progress persisted');
