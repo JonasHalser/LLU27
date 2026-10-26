@@ -1,8 +1,8 @@
 <?php
 declare(strict_types=1);
-require_once dirname(__DIR__, 2).'/backyard_private/app/bootstrap.php';
-require_once dirname(__DIR__, 2).'/backyard_private/app/motivation.php';
-require_once dirname(__DIR__, 2).'/backyard_private/app/weekly_goals.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/bootstrap.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/motivation.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/weekly_goals.php';
 $u=requireUser();
 db()->exec('DELETE FROM activities WHERE cache_updated_at < UTC_TIMESTAMP() - INTERVAL 7 DAY');
 $err='';
@@ -33,13 +33,14 @@ $teamStmt = db()->prepare("
  LEFT JOIN activities a ON a.user_id = u.id
     AND a.activity_date >= CONCAT(u.start_date, ' 00:00:00')
     AND a.cache_updated_at >= UTC_TIMESTAMP() - INTERVAL 7 DAY
+    AND a.avg_hr IS NOT NULL AND a.avg_hr > 0
  WHERE u.username IN ('tim', 'jonas', 'noah')
  GROUP BY u.id, u.username, u.display_name, u.start_date
  ORDER BY FIELD(u.username, 'tim', 'jonas', 'noah')
 ");
 $teamStmt->execute();
 $teamRows = $teamStmt->fetchAll();
-$teamMax = max(1.0, ...array_map(static fn(array $r): float => (float)$r['km'], $teamRows));
+$teamMax = max([1.0, ...array_map(static fn(array $r): float => (float)$r['km'], $teamRows)]);
 $teamTotal = array_sum(array_map(static fn(array $r): float => (float)$r['km'], $teamRows));
 $weeklyGoals=[];$weeklyGoalStreaks=[];$teamWeeklyGoal=null;$weeklyGoalError='';
 try{$weeklyGoals=weeklyGoalTeam($goalPeriod);$weeklyGoalStreaks=weeklyGoalStreaks($goalPeriod);$teamWeeklyGoal=teamWeeklyGoal($goalPeriod,$weeklyGoals);}catch(PDOException $e){$weeklyGoalError='Wochenziele sind noch nicht eingerichtet. Bitte die Datenbankmigration ausführen.';}
@@ -51,6 +52,7 @@ $teamWeekStmt=db()->prepare("SELECT u.username, u.display_name, u.share_team_hr,
  WHERE u.username IN ('tim','jonas','noah')
  AND a.activity_date>=CONCAT(u.start_date,' 00:00:00')
  AND a.cache_updated_at>=UTC_TIMESTAMP()-INTERVAL 7 DAY
+ AND a.avg_hr IS NOT NULL AND a.avg_hr>0
  ORDER BY a.activity_date ASC");
 $teamWeekStmt->execute();
 $teamWeeks=[];$teamStats=[];$teamRuns=[];$teamScatter=[];
@@ -212,18 +214,18 @@ try{$motivationQuotes=motivationQuoteTexts();}catch(PDOException $e){if(!motivat
   <?php endforeach;?>
   </div>
  <?php endif;?>
- <p class="team-disclaimer">Vergleich aus den verfügbaren Aktivitäten; fremde Herzfrequenzwerte nur mit allgemeiner und persönlicher Freigabe. Liegen Aktivitäten außerhalb des gültigen Caches, wird hier nicht der historische Gesamtstand angezeigt.</p>
+ <p class="team-disclaimer">Es werden nur Läufe mit erfasster Ø-Herzfrequenz berücksichtigt. Fremde Herzfrequenzwerte erscheinen nur mit allgemeiner und persönlicher Freigabe. Liegen Aktivitäten außerhalb des gültigen Caches, wird hier nicht der historische Gesamtstand angezeigt.</p>
 </section>
 
 <section class="charts team-charts" aria-label="Gemeinsamer Wochenvergleich">
  <div class="team-controls-note">Auswahl oben: <strong id="team-selection-count">3 von 3</strong> Athleten aktiv. <?php if(!$teamHeartAllowed):?>Der Team-HF-Vergleich benötigt zuerst die allgemeine Strava-Freigabe. Danach kann jeder Läufer die eigenen HF-Werte im Profil freigeben.<?php endif;?></div>
- <article class="panel"><h2>Wochenkilometer im Teamvergleich</h2><p class="muted">ISO-Kalenderwochen (KW) · letzter verfügbarer 12-Wochen-Zeitraum</p><div class="canvas"><canvas id="team-weekly"></canvas></div></article>
+ <article class="panel"><h2>Wochenkilometer im Teamvergleich</h2><p class="muted">Nur Läufe mit erfasster Ø-Herzfrequenz · ISO-Kalenderwochen (KW)</p><div class="canvas"><canvas id="team-weekly"></canvas></div></article>
  <article class="panel"><h2>Herzfrequenz im Teamvergleich</h2><p class="muted">Mittelwert pro Lauf und KW; eigene HF und freigegebene HF-Werte der anderen Läufer</p><div class="canvas"><canvas id="team-heart"></canvas></div></article>
 </section>
 <section class="stats" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))"><?php foreach($teamStats as $person=>$summary):
  $summaryHr=$summary['hrCount']>0?round($summary['hrSum']/$summary['hrCount']):null;
  $summaryPace=$summary['km']>0?(int)round($summary['seconds']/$summary['km']):0;
-?><article class="stat team-entry team-<?=h($person)?>"><span><?=h($summary['name'])?></span><strong><?=h(percent($summary['km']))?> <small>km</small></strong><p><?=h(percent($summary['km']/6.706))?> Runden · <?=h((string)floor($summary['seconds']/3600))?> h · <?=h((string)$summary['count'])?> Läufe</p><p>Ø HF <?=h($summaryHr??'–')?> bpm · Ø Pace <?=h($summaryPace>0?sprintf('%d:%02d',intdiv($summaryPace,60),$summaryPace%60):'–')?> min/km</p></article><?php endforeach;?></section><section class="charts"><article class="panel"><h2>Wochenkilometer</h2><p class="muted">Letzte 12 erfasste Trainingswochen (KW)</p><div class="canvas"><canvas id="weekly"></canvas></div></article><article class="panel"><h2>Herzfrequenz-Trend</h2><p class="muted">Mittlere Ø-HF pro Lauf, je KW</p><div class="canvas"><canvas id="heart"></canvas></div></article><article class="panel wide"><h2>Pace × Herzfrequenz</h2><p class="muted">Jeder Punkt steht für einen Lauf · niedrigerer Puls bei gleicher Pace kann ein positives Signal sein</p><div class="canvas"><canvas id="scatter"></canvas></div></article></section>
+?><article class="stat team-entry team-<?=h($person)?>"><span><?=h($summary['name'])?></span><strong><?=h(percent($summary['km']))?> <small>km</small></strong><p><?=h(percent($summary['km']/6.706))?> Runden · <?=h((string)floor($summary['seconds']/3600))?> h · <?=h((string)$summary['count'])?> Läufe</p><p>Ø HF <?=h($summaryHr??'–')?> bpm · Ø Pace <?=h($summaryPace>0?sprintf('%d:%02d',intdiv($summaryPace,60),$summaryPace%60):'–')?> min/km</p></article><?php endforeach;?></section><section class="charts"><article class="panel"><h2>Wochenkilometer</h2><p class="muted">Letzte 12 erfasste Trainingswochen mit Herzfrequenz (KW)</p><div class="canvas"><canvas id="weekly"></canvas></div></article><article class="panel"><h2>Herzfrequenz-Trend</h2><p class="muted">Mittlere Ø-HF pro Lauf, je KW</p><div class="canvas"><canvas id="heart"></canvas></div></article><article class="panel wide"><h2>Pace × Herzfrequenz</h2><p class="muted">Jeder Punkt steht für einen Lauf · niedrigerer Puls bei gleicher Pace kann ein positives Signal sein</p><div class="canvas"><canvas id="scatter"></canvas></div></article></section>
 <?php require __DIR__.'/partials/supporter-runner.php'; ?>
-<section class="panel"><h2>Letzte Läufe im Team</h2><div class="tablewrap"><table><thead><tr><th>Datum</th><th>Läufer</th><th>Distanz</th><th>Pace</th><th>Ø HF</th><th>Höhenmeter</th></tr></thead><tbody><?php foreach(array_slice($teamRuns,0,90) as $r):?><tr class="team-entry team-<?=h($r['athlete'])?>"><td><?=h(date('d.m.Y',strtotime($r['date'])))?></td><td><?=h($r['runner'])?></td><td><?=h(percent($r['km']))?> km</td><td><?=h($r['pace']!==null?sprintf('%d:%02d',intdiv((int)round($r['pace']*60),60),(int)round($r['pace']*60)%60):'–')?></td><td><?=h($r['hr']??'–')?></td><td><?=h($r['elev'])?> m</td></tr><?php endforeach;?><?php if(!$teamRuns):?><tr><td colspan="6">Noch keine Läufe vorhanden. Bitte auf den ersten Sync warten.</td></tr><?php endif;?></tbody></table></div></section>
+<section class="panel"><h2>Letzte Läufe im Team</h2><p class="muted">Gefiltert: nur Läufe mit erfasster Ø-Herzfrequenz.</p><div class="tablewrap"><table><thead><tr><th>Datum</th><th>Läufer</th><th>Distanz</th><th>Pace</th><th>Ø HF</th><th>Höhenmeter</th></tr></thead><tbody><?php foreach(array_slice($teamRuns,0,90) as $r):?><tr class="team-entry team-<?=h($r['athlete'])?>"><td><?=h(date('d.m.Y',strtotime($r['date'])))?></td><td><?=h($r['runner'])?></td><td><?=h(percent($r['km']))?> km</td><td><?=h($r['pace']!==null?sprintf('%d:%02d',intdiv((int)round($r['pace']*60),60),(int)round($r['pace']*60)%60):'–')?></td><td><?=h($r['hr']??'–')?></td><td><?=h($r['elev'])?> m</td></tr><?php endforeach;?><?php if(!$teamRuns):?><tr><td colspan="6">Keine Läufe mit erfasster Herzfrequenz im Cache.</td></tr><?php endif;?></tbody></table></div></section>
 <?php if($a):?><section class="foot"><form method="post" onsubmit="return confirm('Strava-Verbindung und lokale Daten wirklich löschen?')"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="disconnect"><button class="outline danger">Strava trennen und Daten löschen</button></form></section><?php endif;?></div><script id="chart-data" type="application/json"><?=json_encode($data,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script></body></html>

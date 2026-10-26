@@ -4,7 +4,7 @@
 
 Die Supporter Zone nutzt eigene Konten, Session-Cookies und widerrufbare Remember-Tokens. Eine öffentliche Registrierung erzeugt niemals einen Eintrag in `users`. Läufer-Login, OAuth und Performance-Berechnungen bleiben bestehen. Die Challenge-Seite und Supporter-Auswertung verwenden dieselbe Funktion `challengeScore()`.
 
-Wochentipps schließen **Montag 18:00 UTC** (20:00 Uhr MESZ / 19:00 Uhr MEZ). Eine neue Woche beginnt Montag 00:00 UTC, passend zum vorhandenen Challenge-Cronjob. Nach vollständiger Finalisierung aller drei Läufer wird die Tippwertung bei jedem Aufruf automatisch aus den gespeicherten Ergebnissen berechnet. Co-Sieger zählen jeweils als richtig; Null-Loop-Wochen haben keinen Sieger. Kein eigener Auswertungs-Cronjob, keine zusätzlichen Strava-Aufrufe.
+Das Wettportal liegt im eigenen Reiter `/supporter/bets.php`. Wetten auf den Wochensieger sind bis Mittwoch 23:59:59 Berliner Zeit offen. Missionswetten gibt es nur auf den Abschluss, nie auf die Annahme. Richtige Tipps teilen den Pool proportional und erhalten zusätzlich 20 Prozent des Einsatzes als Bonus; Bruchteile werden auf ganze Coins abgerundet. Co-Sieger zählen jeweils als richtig. Abgerechnete Wettgewinne erscheinen im Supporter-Ranking.
 
 Kilometer und Läufe sind Cache-Summen ab persönlichem Trainingsstart, kein Langzeitarchiv. Ein Loop ist die Summe der je Aktivität abgerundeten vollständigen 6.706 Meter. Fortschrittsbalken vergleichen verfügbare Kilometer im Team und sind keine medizinische oder Zielprognose. Challenge-Historie kommt aus `challenge_weekly`.
 
@@ -16,10 +16,14 @@ Für den Fortschritt zählen nur synchronisierte Laufaktivitäten, die nach der 
 
 Jeder Supporter erhält pro Berliner Kalendermonat genau einen Joker auf der Unterseite `/supporter/jokers.php`. Er kann das aktuelle persönliche Wochenziel eines Läufers um 20 Prozent erhöhen, innerhalb von 30 Stunden einen Lauf über mindestens 75 Prozent der bisherigen Durchschnittsdistanz verlangen oder den nächsten Lauf auf mindestens 150 Prozent der bisherigen Durchschnittsdistanz setzen. Die Berechnungsgrundlage wird beim Einsatz festgeschrieben. Ein Erfolg schützt nur die vorhandenen Missionspunkte; ein Fehlschlag zieht dauerhaft drei Punkte ab. Ungenutzte Monats-Joker werden nicht angespart und jede laufende Joker-Frist endet spätestens mit dem Berliner Monatswechsel. Wochenziele mit aktivem Joker können für die betroffene Woche nicht geändert oder gelöscht werden.
 
+Supporter bekommen bei der Registrierung einmalig 100 LLU Coins und für den ersten authentifizierten Seitenaufruf pro Berliner Kalendertag 10 Coins. Der Kontostand und ein Buchungsverlauf stehen unter „Konto“. Pools werden durch den ersten Tipp geöffnet und anhand der Challenge- beziehungsweise Missionsdaten automatisch geschlossen und ausgewertet. Ohne Gewinner werden die Einsätze erstattet. Offene Einsätze verhindern die Löschung eines Kontos.
+
+Im Wettportal sehen eingeloggte Supporter die Einsätze und Poolanteile der anderen in einer Grafik, die alle 15 Sekunden aktualisiert wird. Supporter können außerdem automatische Laufziel-Pools eröffnen, zum Beispiel „Tim läuft bis Freitag mindestens 100 km“. Dafür muss der Läufer seine Supporter-Laufdaten freigegeben haben. Ziele werden nach Kilometern oder vollständigen Loops ausgewertet, laufen höchstens sieben Tage und werden bei Widerruf der Freigabe abgebrochen; Einsätze werden dann zurückgezahlt. Die Migration `20261026_supporter_custom_bets.sql` speichert dafür nur die nötigen Aktivitätssummen bis zur Auswertung, auch wenn der normale Aktivitäts-Cache abläuft.
+
 ## Hostinger vorbereiten (manuell; kein Deployment wurde ausgeführt)
 
 1. Datenbank sichern. Auf Hostinger PHP **8.2 oder neuer** mit PDO MySQL, mbstring, curl und OpenSSL aktivieren. HTTPS ist erforderlich; Cookies sind ausschließlich `Secure`.
-2. In phpMyAdmin die Dateien `backyard_private/sql/20261024_supporter.sql`, `backyard_private/sql/20261026_weekly_goals.sql`, `backyard_private/sql/20261026_supporter_missions.sql` und `backyard_private/sql/20261026_supporter_jokers.sql` in derselben Datenbank wie `users` importieren. Sie sind wiederholbar, löschen keine Trainingsdaten und setzen die bestehende `users`-Tabelle voraus. Die Wochenziel-Migration ergänzt bei einer bereits installierten ersten Version die Serien-Spalten und legt das gemeinsame Teamziel an. Bei anderweitig angepassten Tabellen Spalten und Typen vorher mit den Migrationen vergleichen.
+2. In phpMyAdmin die Dateien `backyard_private/sql/20261024_supporter.sql`, `backyard_private/sql/20261026_weekly_goals.sql`, `backyard_private/sql/20261026_supporter_missions.sql` und `backyard_private/sql/20261026_supporter_jokers.sql` in derselben Datenbank wie `users` importieren. Danach nacheinander `backyard_private/sql/20261026_supporter_coins.sql`, `backyard_private/sql/20261026_supporter_daily_bonus.sql` und `backyard_private/sql/20261026_supporter_custom_bets.sql` ausführen. Die Coin- und Tagesbonus-Migrationen ergänzen Strukturen und setzen kein vorhandenes Guthaben zurück; das Startguthaben wird pro Supporter nur einmal vergeben. Führe alle Migrationen vor dem neuen Anwendungscode aus. Sie löschen keine Trainingsdaten und setzen die bestehende `users`-Tabelle voraus.
 3. Private Konfiguration in `domains/zjung-partyband.de/backyard_private/.env` ergänzen (siehe unten). Keine Secrets in öffentliche Verzeichnisse, Workflow-Inputs oder Repository schreiben.
 4. Composer-Pakete installieren: im lokalen/private Arbeitsverzeichnis `composer install --no-dev --prefer-dist --optimize-autoloader`. GitHub Actions installiert und überträgt `vendor/` jetzt in das **private** Verzeichnis. SQL wird weiterhin nicht automatisch ausgeführt. Das bestehende manuelle Deployment hat weiterhin `dry_run: true` als Standard. Erst selbst Dry-Run prüfen, anschließend ein gewünschtes Deployment gesondert auslösen.
 5. `APP_URL` muss die tatsächliche öffentliche Basis einschließlich Unterverzeichnis sein: `https://zjung-partyband.de/backyard`. Öffentliche Dateien liegen unter `public_html/backyard/`, private Dateien daneben unter `backyard_private/`. Nicht `backyard_private` unter `public_html` ablegen.
@@ -27,7 +31,7 @@ Jeder Supporter erhält pro Berliner Kalendermonat genau einen Joker auf der Unt
 7. Supporter registrieren sich unter `<APP_URL>/supporter/register.php` und melden sich unter `/supporter/login.php` an. Der öffentliche Läufer-Login verlinkt beide Seiten.
 8. Hostinger-Cronjob **jede Minute**: `/usr/bin/php /home/u489447694/domains/zjung-partyband.de/backyard_private/bin/supporter_push.php`. Den tatsächlichen PHP-CLI-Pfad in hPanel prüfen. Bestehende Sync- und Challenge-Cronjobs beibehalten. Push ist verzögert bis zum nächsten Cronlauf.
 
-Ohne Push-Schlüssel funktionieren Registrierung, Login, Dashboard, Nachrichten und Tipps weiterhin. Ohne SQL-Migration ist die neue Zone nicht benutzbar; das Läufer-Dashboard zeigt einen Hinweis im optionalen Supporter-Modul.
+Ohne Push-Schlüssel funktionieren Registrierung, Login, Dashboard, Nachrichten und Coin-Pools weiterhin. Ohne die SQL-Migrationen ist die neue Zone nicht benutzbar; das Läufer-Dashboard zeigt einen Hinweis im optionalen Supporter-Modul.
 
 ## Private `.env`-Variablen
 
@@ -36,9 +40,10 @@ Bestehende `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS`, `APP_URL` und 
 | Variable | Zweck |
 |---|---|
 | `SUPPORTER_RATE_KEY` | Separater zufälliger Schlüssel für gehashte Rate-Limit-Kennungen; mindestens 32 zufällige Bytes. Fallback ist der vorhandene `TOKEN_KEY`. |
+| `SUPPORTER_DAILY_COIN_REWARD` | LLU-Coins pro Berliner Kalendertag; optional, Standardwert `10`. |
 | `SUPPORTER_PRIVACY_URL` | Optional: HTTPS-Link zum bereitgestellten Datenschutztext. |
 | `SUPPORTER_TERMS_URL` | Optional: HTTPS-Link zu bereitgestellten Nutzungsbedingungen. Sobald einer der Links konfiguriert ist, muss das Registrierungsformular die Zustimmung erhalten. |
-| `SUPPORTER_ADMIN_RUNNER_IDS` | Kommagetrennte IDs bestehender Läuferkonten, die Nachrichten moderieren dürfen. Leer bedeutet keine Moderatoren. Keine Supporter-ID verwenden. |
+| `SUPPORTER_ADMIN_RUNNER_IDS` | Kommagetrennte IDs bestehender Läuferkonten, die Anfeuerungen moderieren dürfen. Leer bedeutet keine Moderatoren. Keine Supporter-ID verwenden. |
 | `VAPID_PUBLIC_KEY` | Öffentlicher VAPID-Schlüssel; darf dem Browser übergeben werden. |
 | `VAPID_PRIVATE_KEY` | Geheimer VAPID-Schlüssel; ausschließlich private `.env`. |
 | `VAPID_SUBJECT` | Kontakt, beispielsweise `mailto:betreiber@example.org`. |
@@ -65,7 +70,7 @@ Abonnements sind pro Gerät gespeichert und mit `TOKEN_KEY` verschlüsselt. Ein 
 
 Unterstützte Gateways: Google FCM, Mozilla, Apple und Windows Notify; fremde URLs, Ports und lokale Ziele werden abgelehnt. Der Versandjob entfernt HTTP-404/410-Abonnements über die Bibliothek. Temporäre Fehler werden bis zu fünfmal versucht; erfolgreich versandte Geräte werden bei regulären Wiederholungen übersprungen. Bei Prozessabbruch direkt nach erfolgreichem Versand kann eine Nachricht doppelt zugestellt werden; ein stabiler Notification-Tag begrenzt sichtbare Duplikate. Logs enthalten nur Job-/Subscription-ID, Status bzw. Fehlerklasse, keine URLs, Tokens oder Nachrichten. hPanel-Logs überwachen. Abgelaufene Rate-Limits und Remember-Tokens werden durch den Job bereinigt, auch ohne VAPID-Konfiguration. Nicht versandte Jobs verfallen nach einem Tag.
 
-Anfeuerungen und Anzeigenamen sind für angemeldete Supporter sichtbar, der Highscore zeigt Anzeigenamen. Kontolöschung entfernt eigene Anfeuerungen, Tipps, Tokens und Abonnements. Nachrichtenmoderation: als konfigurierter Läufer `/supporter/moderation.php` öffnen; die letzten 200 Nachrichten sind löschbar. Datenschutz-/Nutzungstexte werden nicht erfunden und müssen vom Betreiber bereitgestellt werden.
+Anfeuerungen und Anzeigenamen sind für angemeldete Supporter sichtbar, der Highscore zeigt Anzeigenamen. Kontolöschung entfernt eigene Anfeuerungen, Tipps, Tokens und Abonnements. Alle angemeldeten Läufer können `/supporter/admin.php` öffnen und Supporter-Konten verwalten; die Seite ist auch im Läufer-Dashboard verlinkt. Beim Löschen bleiben Teammissionen und Joker als anonymisierter Verlauf erhalten. Anfeuerungen moderieren: `/supporter/moderation.php`; dafür sind die konfigurierten Läufer-Admin-IDs nötig und die letzten 200 Nachrichten sind löschbar. Die Admin-IDs lassen sich mit `SELECT id, username FROM users;` ermitteln. Datenschutz-/Nutzungstexte werden nicht erfunden und müssen vom Betreiber bereitgestellt werden.
 
 ## Tests und Abnahme
 
@@ -83,7 +88,7 @@ Staging-Abnahme mit eigener Datenbank und HTTPS:
 - Anzeigename ändern, Passwort ändern, alte Sitzungen auf anderem Gerät ablehnen, Konto löschen; abhängige Daten prüfen.
 - Drei Freigaben einzeln setzen/widerrufen; nur freigegebene Summen anzeigen. Dashboard, Challenge und Performance der Läufer prüfen.
 - Nachricht senden, Empfänger und Cooldown prüfen; XSS-Text muss als Text erscheinen. Läuferansicht und Moderation prüfen.
-- Tipp vor/nach Montag 18:00 UTC prüfen, eine Auswahl pro Woche, Änderung bis Frist; finale Wochen mit Gleichstand, Null-Loops und fehlendem Läufer prüfen.
+- Wochensieger-Wette vor/nach Mittwoch 23:59:59 Berliner Zeit prüfen; finale Wochen mit Gleichstand, Null-Loops und fehlendem Läufer prüfen. Poolanteil, 20-%-Bonus, tägliche Anmeldung und Supporter-Gewinnerübersicht prüfen.
 - Supporter-Mission mit 1–5 Punkten und Berliner Frist erstellen. Exklusive Mission gleichzeitig mit zwei Läufern annehmen und die atomare Sperre prüfen; offene Mission mit allen Läufern annehmen. Aktivitäten vor der Annahme und nach der Frist dürfen nicht zählen. Kilometer, Laufzeit und vollständige Loops sowie dauerhafte Punkte nach Cache-Ablauf prüfen. Erfüllte Missionen dürfen nicht mehr abgesagt werden.
 - Push auf echtem Desktop und iPhone-PWA aktivieren. Cronjob ausführen, richtigen Empfänger und mehrere Geräte prüfen. Verweigerte Erlaubnis, Abmelden, Gerätewechsel, Ausschalten sowie abgelaufene Abonnements prüfen.
 - Responsive Navigation bei 360, 768 und 1280 Pixeln; Overlay, Escape, Tastaturfokus und Sidebar prüfen.

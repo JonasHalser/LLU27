@@ -1,10 +1,9 @@
 <?php
 // Optional module: a pending supporter migration must never break the runner dashboard.
-require_once dirname(__DIR__,3).'/backyard_private/app/supporter.php';
-require_once dirname(__DIR__,3).'/backyard_private/app/push.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/supporter.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/push.php';
 $supporterError=''; $supporterMessages=[]; $supporterReady=false; $sharing=false;
-$adminIds=array_filter(array_map('intval',explode(',',cfg('SUPPORTER_ADMIN_RUNNER_IDS'))));
-$supporterAdmin=in_array((int)$u['id'],$adminIds,true);
+$supporterAdmin=isSupporterAdminRunner((int)$u['id']);
 try {
     $q=db()->prepare('SELECT runner_id FROM supporter_sharing WHERE runner_id=?'); $q->execute([$u['id']]); $sharing=(bool)$q->fetchColumn(); $supporterReady=true;
     if($_SERVER['REQUEST_METHOD']==='POST' && str_starts_with((string)($_POST['action']??''),'supporter_')) {
@@ -22,5 +21,5 @@ try {
 <?php if(!$supporterMessages): ?><p>Noch keine Anfeuerungen. Teile die <a href="supporter/register.php">Supporter-Registrierung</a>.</p><?php endif; ?>
 <?php foreach($supporterMessages as $c): ?><article><strong><?=h($c['sender'])?></strong><p><?=h($c['message'])?></p><small><?=h($c['created_at'])?> UTC</small><?php if($supporterAdmin): ?><form method="post"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="supporter_delete"><input type="hidden" name="cheer_id" value="<?=h($c['id'])?>"><button type="submit">Nachricht löschen</button></form><?php endif; ?></article><?php endforeach; ?>
 <h3>Freigabe für die Supporter Zone</h3><p>Freigegeben werden dein Anzeigename, aggregierte Kilometer, Laufanzahl, Loops, Wochenkilometer und Challenge-Ergebnisse. Keine Routen, Aktivitätsdetails oder Gesundheitswerte.</p><form method="post"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="supporter_share"><label><input type="checkbox" name="approved" value="1" <?=$sharing?'checked':''?>> Ich gebe meine Trainingssummen und Challenge-Ergebnisse für registrierte Supporter frei.</label><button type="submit">Freigabe speichern</button></form>
-<?php if($supporterAdmin): ?><p><a href="supporter/moderation.php">Alle Nachrichten moderieren</a></p><?php endif; ?>
+<p><a href="supporter/admin.php">Supporter verwalten</a><?php if($supporterAdmin): ?> · <a href="supporter/moderation.php">Anfeuerungen moderieren</a><?php endif; ?></p>
 <?php endif; ?></section><?php if($supporterReady) pushPanel('runner'); ?>

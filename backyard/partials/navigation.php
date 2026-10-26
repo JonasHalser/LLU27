@@ -5,16 +5,14 @@ $lluPage = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
 $lluLinks = [
   ['dashboard.php', 'Dashboard', '▦'],
   ['weekly-goals.php', 'Wochenziele', '◎'],
-  ['missions.php', 'Missionen', '◆'],
-  ['jokers.php', 'Joker', '!'],
   ['performance.php', 'Performance', '↗'],
-  ['challenge.php', 'Challenge', '★'],
+  ['competition.php', 'Wettkampf', '★'],
   ['motivation.php', 'Motivation', '✦'],
   ['profile.php', 'Mein Profil', '◉'],
 ];
 ?>
 <button class="llu-menu-button" type="button" id="llu-menu-button" aria-controls="llu-sidebar" aria-expanded="false" aria-label="Navigation öffnen">
-  <span aria-hidden="true">☰</span><span>LLU 27</span><span class="llu-menu-button-label">Menü</span>
+  <span aria-hidden="true">☰</span><span>LLU 27</span>
 </button>
 <div class="llu-menu-backdrop" id="llu-menu-backdrop" hidden></div>
 <aside class="llu-sidebar" id="llu-sidebar" aria-label="Hauptnavigation">

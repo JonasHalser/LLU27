@@ -1,3 +1,3 @@
 <?php
-require_once dirname(__DIR__,3).'/backyard_private/app/push.php';
+require_once dirname($_SERVER['DOCUMENT_ROOT']).'/backyard_private/app/push.php';
 pushPanel('supporter');

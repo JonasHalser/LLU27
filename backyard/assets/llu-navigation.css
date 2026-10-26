@@ -230,12 +230,6 @@ body.llu-layout {
         color: #fc4c02;
     }
 
-    .llu-menu-button-label {
-        margin-left: auto;
-        color: #a8b9c9;
-        font-size: 12px;
-    }
-
     .llu-sidebar {
         width: min(280px, 85vw);
         transform: translateX(-105%);
@@ -261,10 +255,6 @@ body.llu-layout {
         width: auto;
         justify-content: center;
         padding: 0 8px;
-    }
-
-    .llu-layout.llu-nav-open .llu-menu-button-label {
-        display: none;
     }
 
     .llu-layout.llu-nav-open {

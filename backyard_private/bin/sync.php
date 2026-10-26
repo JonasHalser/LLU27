@@ -11,6 +11,7 @@ require_once dirname(__DIR__) . '/app/performance_sync.php';
 require_once dirname(__DIR__) . '/app/weekly_goals.php';
 require_once dirname(__DIR__) . '/app/missions.php';
 require_once dirname(__DIR__) . '/app/jokers.php';
+require_once dirname(__DIR__) . '/app/supporter_coins.php';
 
 $lock = fopen(dirname(__DIR__) . '/sync.lock', 'c');
 
@@ -19,6 +20,12 @@ if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) {
 }
 
 try {
+    try {
+        supporterCoinRefreshCustomMarkets();
+    } catch (PDOException $e) {
+        echo "Eigene Wettziele noch nicht eingerichtet\n";
+    }
+
     foreach (runSync() as $line) {
         echo $line . "\n";
     }
@@ -37,6 +44,13 @@ try {
     } catch (PDOException $e) {
         // Training sync remains available until the optional migration is installed.
         echo "Supporter-Missionen noch nicht eingerichtet\n";
+    }
+
+    try {
+        supporterCoinRefreshCustomMarkets();
+        echo "Eigene Wettziele aktualisiert\n";
+    } catch (PDOException $e) {
+        echo "Eigene Wettziele noch nicht eingerichtet\n";
     }
 
     try {
