@@ -78,7 +78,6 @@ foreach(['tim','jonas','noah'] as $person){
 
 $a=activeAthlete((int)$u['id']);
 $data=['team'=>$teamChart];
-?><!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>LLU 27 · Backyard Running · <?=h($u['display_name'])?></title><link rel="icon" type="image/png" href="assets/llu27-icon.png"><link rel="stylesheet" href="assets/style.css?v=llu27-hf-consent-1"><link rel="apple-touch-icon" href="assets/apple-touch-icon.png"><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#101923"><meta name="apple-mobile-web-app-title" content="LLU 27"><style>
 
 // Countdown bis zum LLU-27-Start (deutsche Ortszeit) und Motivationssprüche für den Typewriter.
 $raceStart=new DateTimeImmutable('2027-04-30 12:00:00',new DateTimeZone('Europe/Berlin'));
