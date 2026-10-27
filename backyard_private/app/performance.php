@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
-/** LLU27 Performance analytics: compact activity streams; no GPS coordinates. */
+/** LLU27 Performance analytics: private compact activity streams and route. */
 function ll27Performance(array $stream, float $maxHr): array {
     $ts = $stream['time']['data'] ?? [];
     $ds = $stream['distance']['data'] ?? [];
     $hs = $stream['heartrate']['data'] ?? [];
-    if (!is_array($ts) || !is_array($ds)) return ['analysis_version'=>3,'timeline'=>[],'splits'=>[], 'zones'=>[], 'drift'=>null, 'points'=>0];
+    if (!is_array($ts) || !is_array($ds)) return ['analysis_version'=>4,'timeline'=>[],'splits'=>[], 'zones'=>[], 'drift'=>null, 'points'=>0];
     $n = min(count($ts), count($ds));
     $samples=[]; $lastDistance=-1.0; $lastTime=-1.0;
     for ($i=0;$i<$n;$i++) {
@@ -21,9 +21,13 @@ function ll27Performance(array $stream, float $maxHr): array {
         }
         $moving=$stream['moving']['data'][$i]??null;
         $sample['moving']=is_bool($moving)?$moving:null;
+        $coord=$stream['latlng']['data'][$i]??null;
+        $sample['latlng']=is_array($coord)&&count($coord)===2&&is_numeric($coord[0])&&is_numeric($coord[1])
+            &&abs((float)$coord[0])<=90&&abs((float)$coord[1])<=180
+            ?[round((float)$coord[0],5),round((float)$coord[1],5)]:null;
         $samples[]=$sample;$lastTime=$time;$lastDistance=$dist;
     }
-    $n=count($samples);if($n<2)return ['analysis_version'=>3,'timeline'=>[],'splits'=>[], 'zones'=>[], 'drift'=>null, 'points'=>$n];
+    $n=count($samples);if($n<2)return ['analysis_version'=>4,'timeline'=>[],'splits'=>[], 'zones'=>[], 'drift'=>null, 'points'=>$n];
     $zones=array_fill(0,5,0.0);$zoneLimits=[.60,.70,.80,.90];
     // Zwischen zwei Messpunkten Zeit nur bis 120 s werten; GPS/HR-Lücken nicht extrapolieren.
     for($i=1;$i<$n;$i++){
@@ -53,7 +57,20 @@ function ll27Performance(array $stream, float $maxHr): array {
         $one=ll27Efficiency($samples,$startD,$mid);$two=ll27Efficiency($samples,$mid,$lastD);
         if($one!==null && $two!==null && $one>0)$drift=round(($two/$one-1)*100,1);
     }
-    return ['analysis_version'=>3,'timeline'=>ll27Timeline($samples),'splits'=>$splits,'zones'=>array_map(static fn($x)=>(int)round($x),$zones),'drift'=>$drift,'points'=>$n,'distance_m'=>round($lastD,1)];
+    return ['analysis_version'=>4,'route'=>ll27Route($samples),'timeline'=>ll27Timeline($samples),'splits'=>$splits,'zones'=>array_map(static fn($x)=>(int)round($x),$zones),'drift'=>$drift,'points'=>$n,'distance_m'=>round($lastD,1)];
+}
+function ll27Route(array $samples):array {
+    $route=[];$step=max(1,(int)ceil(count($samples)/2000));$broken=true;$previous=null;
+    foreach($samples as $i=>$sample){
+        if($previous!==null&&$sample['t']-$previous>120)$broken=true;
+        $previous=$sample['t'];
+        if(($sample['latlng']??null)===null){$broken=true;continue;}
+        if($i%$step!==0&&$i!==count($samples)-1)continue;
+        $route[]=['latlng'=>$sample['latlng'],'km'=>round($sample['d']/1000,3),
+            'seconds'=>round($sample['t']),'hr'=>$sample['hr'],'break'=>$broken];
+        $broken=false;
+    }
+    return $route;
 }
 // Zeitfenster statt sekündlicher GPS-Pace: höchstens etwa 600 Punkte pro Lauf.
 // Zeitgewichtete Fenster; optionale Streams bleiben bei fehlenden Messungen null.
