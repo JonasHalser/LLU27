@@ -64,7 +64,7 @@ function weeklyGoalTeam(array $period): array {
         FROM users u
         LEFT JOIN weekly_goals g ON g.user_id=u.id AND g.iso_year=? AND g.iso_week=?
         LEFT JOIN activities a ON a.user_id=u.id AND a.activity_date>=? AND a.activity_date<?
-            AND a.activity_date>=CONCAT(u.start_date,' 00:00:00')
+            AND a.activity_date>='".TRAINING_START." 00:00:00'
             AND a.cache_updated_at>=UTC_TIMESTAMP()-INTERVAL 7 DAY
         WHERE u.username IN ('tim','jonas','noah')
         GROUP BY u.id,u.username,u.display_name,g.unit,g.target_value,g.progress_value,g.achieved_at

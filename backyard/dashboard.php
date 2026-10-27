@@ -12,11 +12,6 @@ $goalPeriod=weeklyGoalPeriod();
 if($_SERVER['REQUEST_METHOD']==='POST') try {
  verifyCsrf();
  $action=(string)($_POST['action']??'');
- if($action==='date') {
-  $date=(string)($_POST['start_date']??'');$dt=DateTimeImmutable::createFromFormat('!Y-m-d',$date);
-  if(!$dt||$dt->format('Y-m-d')!==$date) throw new RuntimeException('Ungültiges Datum');
-  $s=db()->prepare('UPDATE users SET start_date=? WHERE id=?');$s->execute([$date,$u['id']]);redirect('dashboard.php');
- }
  if($action==='disconnect') {
   $s=db()->prepare('DELETE FROM athletes WHERE user_id=?');$s->execute([$u['id']]);
   $s=db()->prepare('DELETE FROM activities WHERE user_id=?');$s->execute([$u['id']]);redirect('dashboard.php');
@@ -33,7 +28,7 @@ $teamStmt = db()->prepare("
         COALESCE(SUM(a.distance_m), 0) / 1000 AS km
  FROM users u
  LEFT JOIN activities a ON a.user_id = u.id
-    AND a.activity_date >= CONCAT(u.start_date, ' 00:00:00')
+    AND a.activity_date >= '".TRAINING_START." 00:00:00'
     AND a.cache_updated_at >= UTC_TIMESTAMP() - INTERVAL 7 DAY
     AND a.avg_hr IS NOT NULL AND a.avg_hr > 0
  WHERE u.username IN ('tim', 'jonas', 'noah')
@@ -47,12 +42,12 @@ $teamTotal = array_sum(array_map(static fn(array $r): float => (float)$r['km'], 
 $weeklyGoals=[];$weeklyGoalStreaks=[];$teamWeeklyGoal=null;$weeklyGoalError='';
 try{$weeklyGoals=weeklyGoalTeam($goalPeriod);$weeklyGoalStreaks=weeklyGoalStreaks($goalPeriod);$teamWeeklyGoal=teamWeeklyGoal($goalPeriod,$weeklyGoals);}catch(PDOException $e){$weeklyGoalError='Wochenziele sind noch nicht eingerichtet. Bitte die Datenbankmigration ausführen.';}
 
-// Teamvergleiche nach ISO-Kalenderwochen, jeweils ab individuellem Trainingsstart.
+// Teamvergleiche nach ISO-Kalenderwochen, ab festem Trainingsstart.
 $teamHeartAllowed=cfg('TEAM_HR_SHARING_APPROVED','0')==='1';
 $teamWeekStmt=db()->prepare("SELECT u.username, u.display_name, u.share_team_hr, a.activity_date, a.distance_m, a.moving_seconds, a.elevation_m, a.avg_hr
  FROM users u JOIN activities a ON a.user_id=u.id
  WHERE u.username IN ('tim','jonas','noah')
- AND a.activity_date>=CONCAT(u.start_date,' 00:00:00')
+ AND a.activity_date>='".TRAINING_START." 00:00:00'
  AND a.cache_updated_at>=UTC_TIMESTAMP()-INTERVAL 7 DAY
  AND a.avg_hr IS NOT NULL AND a.avg_hr>0
  ORDER BY a.activity_date ASC");
@@ -174,7 +169,7 @@ try{$motivationQuotes=motivationQuoteTexts();}catch(PDOException $e){if(!motivat
 .llu-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:520px){.llu-countdown{gap:7px}.llu-countdown-unit{flex:1 1 0;min-width:0;padding:8px 4px}.llu-typewriter{min-height:3em}}
 @media(prefers-reduced-motion:reduce){.llu-typewriter-caret{animation:none}}
-</style><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js" defer></script><script src="assets/charts.js?v=llu27-team-all-2" defer></script><script src="assets/llu-countdown.js?v=1" defer></script><link rel="stylesheet" href="assets/llu-navigation.css?v=3"><script src="assets/llu-navigation.js?v=3" defer></script></head><body class="llu-layout">
+</style><script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js" defer></script><script src="assets/charts.js?v=llu27-team-filters-4" defer></script><script src="assets/llu-countdown.js?v=1" defer></script><link rel="stylesheet" href="assets/llu-navigation.css?v=3"><script src="assets/llu-navigation.js?v=3" defer></script></head><body class="llu-layout">
 <?php require __DIR__ . "/partials/navigation.php"; ?>
 <div class="shell"><header class="top"><div class="brand"><img class="brand-icon" src="assets/llu27-icon.png" alt="LLU 27 Logo" width="56" height="56"> LLU <em>27</em> <span class="brand-caption">/ BACKYARD RUNNING</span></div><nav style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><a class="btn outline" href="profile.php" style="padding:9px 13px">Mein Profil</a><form method="post" action="logout.php"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><span class="username"><?=h($u['display_name'])?></span><button class="outline">Abmelden</button></form></nav></header><section class="hero llu-hero"><div class="hero-copy"><p class="eyebrow"><span class="eyebrow-dot"></span> LLU 27 · THE BACKYARD ULTRA PROJECT</p><h1>ONE MORE LOOP.<br><span>ONE MORE HOUR.</span></h1><p class="muted hero-subtitle">6,706 km. Jede Stunde. Bis nur noch einer läuft.</p><div class="runner-tags" role="group" aria-label="Athleten für Teamvergleiche auswählen"><button type="button" class="runner-toggle runner-tim" data-athlete="tim" aria-pressed="true">TIM</button><button type="button" class="runner-toggle runner-jonas" data-athlete="jonas" aria-pressed="true">JONAS</button><button type="button" class="runner-toggle runner-noah" data-athlete="noah" aria-pressed="true">NOAH</button></div><p class="runner-help">Tippe auf einen Namen, um ihn in allen Anzeigen ein- oder auszublenden.</p><p class="hero-footer">THE ROAD TO LLU 27</p>
 <div class="llu-countdown<?= $raceLeft===0?' is-finished':'' ?>" id="llu-countdown" data-target="<?=h($raceStart->format(DATE_ATOM))?>" role="timer" aria-label="Countdown bis zum Start von LLU 27 am 30.04.2027 um 12:00 Uhr">
@@ -192,11 +187,11 @@ try{$motivationQuotes=motivationQuoteTexts();}catch(PDOException $e){if(!motivat
 <?php if(isset($_GET['connected'])):?><p class="notice">Strava verbunden. Der nächste Cronjob importiert deine Läufe.</p><?php endif;?>
 <?php if($a['sync_error']):?><p class="error">Letzter Sync: <?=h($a['sync_error'])?></p><?php endif;?>
 <?php endif;?>
-<section class="settings"><form method="post" class="dateform"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="date"><label>Trainingsstart <input type="date" name="start_date" value="<?=h($u['start_date'])?>" required></label><button class="outline">Übernehmen</button></form><p class="muted tiny">Letzter Sync: <?=h($a['last_sync']??'Noch nicht synchronisiert')?> UTC · Cache max. 7 Tage</p></section>
-<?php $weeklyGoalConfigure=false; require __DIR__.'/partials/weekly-goals.php'; ?>
+<section class="settings"><p class="muted tiny">Letzter Sync: <?=h($a['last_sync']??'Noch nicht synchronisiert')?> UTC · Cache max. 7 Tage</p></section>
+
 <section class="panel team-board" aria-labelledby="team-heading">
  <div class="team-head">
-  <div><p class="eyebrow">LLU 27 · TEAMVERGLEICH</p><h2 id="team-heading">Unsere Kilometer im Vergleich</h2><p class="muted">Kilometer pro Läufer ab dem eigenen Trainingsstart · vorhandener Strava-Cache (max. 7 Tage)</p></div>
+  <div><p class="eyebrow">LLU 27 · TEAMVERGLEICH</p><h2 id="team-heading">Unsere Kilometer im Vergleich</h2><p class="muted">Kilometer pro Läufer ab dem 01.10.2026 · vorhandener Strava-Cache (max. 7 Tage)</p></div>
   <div class="team-total"><span>TEAM GESAMT</span><strong><?=h(percent((float)$teamTotal))?> km</strong></div>
  </div>
  <?php if(!$teamRows):?>
@@ -218,6 +213,7 @@ try{$motivationQuotes=motivationQuoteTexts();}catch(PDOException $e){if(!motivat
  <?php endif;?>
  <p class="team-disclaimer">Es werden nur Läufe mit erfasster Ø-Herzfrequenz berücksichtigt. Fremde Herzfrequenzwerte erscheinen nur mit allgemeiner und persönlicher Freigabe. Liegen Aktivitäten außerhalb des gültigen Caches, wird hier nicht der historische Gesamtstand angezeigt.</p>
 </section>
+<?php $weeklyGoalConfigure=false; require __DIR__.'/partials/weekly-goals.php'; ?>
 
 <section class="charts team-charts" aria-label="Gemeinsamer Wochenvergleich">
  <div class="team-controls-note">Auswahl oben: <strong id="team-selection-count">3 von 3</strong> Athleten aktiv. <?php if(!$teamHeartAllowed):?>Der Team-HF-Vergleich benötigt zuerst die allgemeine Strava-Freigabe. Danach kann jeder Läufer die eigenen HF-Werte im Profil freigeben.<?php endif;?></div>
@@ -227,7 +223,6 @@ try{$motivationQuotes=motivationQuoteTexts();}catch(PDOException $e){if(!motivat
 <section class="stats" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))"><?php foreach($teamStats as $person=>$summary):
  $summaryHr=$summary['hrCount']>0?round($summary['hrSum']/$summary['hrCount']):null;
  $summaryPace=$summary['km']>0?(int)round($summary['seconds']/$summary['km']):0;
-?><article class="stat team-entry team-<?=h($person)?>"><span><?=h($summary['name'])?></span><strong><?=h(percent($summary['km']))?> <small>km</small></strong><p><?=h(percent($summary['km']/6.706))?> Runden · <?=h((string)floor($summary['seconds']/3600))?> h · <?=h((string)$summary['count'])?> Läufe</p><p>Ø HF <?=h($summaryHr??'–')?> bpm · Ø Pace <?=h($summaryPace>0?sprintf('%d:%02d',intdiv($summaryPace,60),$summaryPace%60):'–')?> min/km</p></article><?php endforeach;?></section><section class="charts"><article class="panel"><h2>Wochenkilometer</h2><p class="muted">Letzte 12 erfasste Trainingswochen mit Herzfrequenz (KW)</p><div class="canvas"><canvas id="weekly"></canvas></div></article><article class="panel"><h2>Herzfrequenz-Trend</h2><p class="muted">Mittlere Ø-HF pro Lauf, je KW</p><div class="canvas"><canvas id="heart"></canvas></div></article><article class="panel wide"><h2>Pace × Herzfrequenz</h2><p class="muted">Jeder Punkt steht für einen Lauf · niedrigerer Puls bei gleicher Pace kann ein positives Signal sein</p><div class="canvas"><canvas id="scatter"></canvas></div></article></section>
-<?php require __DIR__.'/partials/supporter-runner.php'; ?>
+?><article class="stat team-entry team-<?=h($person)?>"><span><?=h($summary['name'])?></span><strong><?=h(percent($summary['km']))?> <small>km</small></strong><p><?=h(percent($summary['km']/6.706))?> Runden · <?=h((string)floor($summary['seconds']/3600))?> h · <?=h((string)$summary['count'])?> Läufe</p><p>Ø HF <?=h($summaryHr??'–')?> bpm · Ø Pace <?=h($summaryPace>0?sprintf('%d:%02d',intdiv($summaryPace,60),$summaryPace%60):'–')?> min/km</p></article><?php endforeach;?></section><section class="charts"><article class="panel wide"><h2>Pace × Herzfrequenz</h2><p class="muted">Jeder Punkt steht für einen Lauf · niedrigerer Puls bei gleicher Pace kann ein positives Signal sein</p><div class="canvas"><canvas id="scatter"></canvas></div></article></section>
 <section class="panel"><h2>Letzte Läufe im Team</h2><p class="muted">Gefiltert: nur Läufe mit erfasster Ø-Herzfrequenz.</p><div class="tablewrap"><table><thead><tr><th>Datum</th><th>Läufer</th><th>Distanz</th><th>Pace</th><th>Ø HF</th><th>Höhenmeter</th></tr></thead><tbody><?php foreach(array_slice($teamRuns,0,90) as $r):?><tr class="team-entry team-<?=h($r['athlete'])?>"><td><?=h(date('d.m.Y',strtotime($r['date'])))?></td><td><?=h($r['runner'])?></td><td><?=h(percent($r['km']))?> km</td><td><?=h($r['pace']!==null?sprintf('%d:%02d',intdiv((int)round($r['pace']*60),60),(int)round($r['pace']*60)%60):'–')?></td><td><?=h($r['hr']??'–')?></td><td><?=h($r['elev'])?> m</td></tr><?php endforeach;?><?php if(!$teamRuns):?><tr><td colspan="6">Keine Läufe mit erfasster Herzfrequenz im Cache.</td></tr><?php endif;?></tbody></table></div></section>
 <?php if($a):?><section class="foot"><form method="post" onsubmit="return confirm('Strava-Verbindung und lokale Daten wirklich löschen?')"><input type="hidden" name="csrf" value="<?=h(csrf())?>"><input type="hidden" name="action" value="disconnect"><button class="outline danger">Strava trennen und Daten löschen</button></form></section><?php endif;?></div><script id="chart-data" type="application/json"><?=json_encode($data,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT)?></script></body></html>
