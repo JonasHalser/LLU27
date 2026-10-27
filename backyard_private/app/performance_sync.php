@@ -157,7 +157,8 @@ function ll27SyncPerformance(): array
             AND a.cache_updated_at >=
                 UTC_TIMESTAMP() - INTERVAL 7 DAY
 
-            AND p.activity_id IS NULL
+            AND (p.activity_id IS NULL
+                OR COALESCE(JSON_EXTRACT(p.detail_json, '$.analysis_version'), 0) < 3)
 
             AND (
                 e.activity_id IS NULL
@@ -165,6 +166,7 @@ function ll27SyncPerformance(): array
             )
 
         ORDER BY
+            (p.activity_id IS NULL) DESC,
             a.activity_date DESC,
             a.id DESC
 
@@ -199,7 +201,7 @@ function ll27SyncPerformance(): array
             'GET',
             $url,
             [
-                'keys' => 'time,distance,heartrate',
+                'keys' => 'time,distance,heartrate,altitude,grade_smooth,watts,cadence,moving,velocity_smooth',
                 'key_by_type' => 'true'
             ],
             $token
