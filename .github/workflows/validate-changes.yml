@@ -30,6 +30,7 @@ jobs:
           node --check backyard/sw.js
           node --check backyard/assets/supporter-push.js
           node --check backyard/supporter/supporter.js
+          node --check backyard/performance.js
       - name: Composer prüfen und installieren
         working-directory: backyard_private
         run: |
@@ -37,7 +38,9 @@ jobs:
           composer install --no-interaction --no-progress --prefer-dist
           composer check-platform-reqs
       - name: Regeln prüfen
-        run: php backyard_private/tests/supporter_test.php
+        run: |
+          php backyard_private/tests/supporter_test.php
+          php backyard_private/tests/performance_test.php
       - name: Testdatenbank und HTTP-Integration
         env:
           MYSQL_PWD: test-only-password

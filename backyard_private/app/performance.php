@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
-/** LLU27 Performance analytics: only time/distance/heartrate streams; no GPS is requested or stored. */
+/** LLU27 Performance analytics: compact activity streams; no GPS coordinates. */
 function ll27Performance(array $stream, float $maxHr): array {
     $ts = $stream['time']['data'] ?? [];
     $ds = $stream['distance']['data'] ?? [];
     $hs = $stream['heartrate']['data'] ?? [];
-    if (!is_array($ts) || !is_array($ds)) return ['splits'=>[], 'zones'=>[], 'drift'=>null, 'points'=>0];
+    if (!is_array($ts) || !is_array($ds)) return ['analysis_version'=>3,'timeline'=>[],'splits'=>[], 'zones'=>[], 'drift'=>null, 'points'=>0];
     $n = min(count($ts), count($ds));
     $samples=[]; $lastDistance=-1.0; $lastTime=-1.0;
     for ($i=0;$i<$n;$i++) {
@@ -13,9 +13,17 @@ function ll27Performance(array $stream, float $maxHr): array {
         $time=(float)$ts[$i];$dist=(float)$ds[$i];
         if($time<0 || $dist<0 || $dist<$lastDistance || $time<=$lastTime)continue;
         $hr= isset($hs[$i]) && is_numeric($hs[$i]) && $hs[$i]>=40 && $hs[$i]<=230 ? (float)$hs[$i] : null;
-        $samples[]=['t'=>$time,'d'=>$dist,'hr'=>$hr];$lastTime=$time;$lastDistance=$dist;
+        $sample=['t'=>$time,'d'=>$dist,'hr'=>$hr];
+        foreach(['altitude'=>[-500,10000],'watts'=>[0,3000],'cadence'=>[0,300],
+            'grade_smooth'=>[-100,100],'velocity_smooth'=>[0,15]] as $key=>$range){
+            $value=$stream[$key]['data'][$i]??null;
+            $sample[$key]=is_numeric($value)&&is_finite((float)$value)&&$value>=$range[0]&&$value<=$range[1]?(float)$value:null;
+        }
+        $moving=$stream['moving']['data'][$i]??null;
+        $sample['moving']=is_bool($moving)?$moving:null;
+        $samples[]=$sample;$lastTime=$time;$lastDistance=$dist;
     }
-    $n=count($samples);if($n<2)return ['splits'=>[], 'zones'=>[], 'drift'=>null, 'points'=>$n];
+    $n=count($samples);if($n<2)return ['analysis_version'=>3,'timeline'=>[],'splits'=>[], 'zones'=>[], 'drift'=>null, 'points'=>$n];
     $zones=array_fill(0,5,0.0);$zoneLimits=[.60,.70,.80,.90];
     // Zwischen zwei Messpunkten Zeit nur bis 120 s werten; GPS/HR-Lücken nicht extrapolieren.
     for($i=1;$i<$n;$i++){
@@ -45,7 +53,46 @@ function ll27Performance(array $stream, float $maxHr): array {
         $one=ll27Efficiency($samples,$startD,$mid);$two=ll27Efficiency($samples,$mid,$lastD);
         if($one!==null && $two!==null && $one>0)$drift=round(($two/$one-1)*100,1);
     }
-    return ['splits'=>$splits,'zones'=>array_map(static fn($x)=>(int)round($x),$zones),'drift'=>$drift,'points'=>$n,'distance_m'=>round($lastD,1)];
+    return ['analysis_version'=>3,'timeline'=>ll27Timeline($samples),'splits'=>$splits,'zones'=>array_map(static fn($x)=>(int)round($x),$zones),'drift'=>$drift,'points'=>$n,'distance_m'=>round($lastD,1)];
+}
+// Zeitfenster statt sekündlicher GPS-Pace: höchstens etwa 600 Punkte pro Lauf.
+// Zeitgewichtete Fenster; optionale Streams bleiben bei fehlenden Messungen null.
+function ll27Timeline(array $samples): array {
+    $first=$samples[0];$last=$samples[count($samples)-1];
+    $window=max(30.0,ceil(($last['t']-$first['t'])/600));
+    $result=[];$anchor=$first;$hrSum=0.0;$hrSeconds=0.0;$gap=false;$sums=[];$weights=[];
+    for($i=1,$n=count($samples);$i<$n;$i++){
+        $a=$samples[$i-1];$b=$samples[$i];$dt=$b['t']-$a['t'];
+        if($dt>120)$gap=true;
+        elseif($a['hr']!==null){$hrSum+=$a['hr']*$dt;$hrSeconds+=$dt;}
+        if($dt<=120){
+            foreach(['altitude','watts','cadence','grade_smooth','velocity_smooth','moving'] as $key){
+                $value=$a[$key]??null;
+                if($value===null)continue;
+                // Geschwindigkeit nur in als bewegt erkannten Abschnitten mitteln.
+                if($key==='velocity_smooth'&&($a['moving']??true)===false)continue;
+                $sums[$key]=($sums[$key]??0)+(float)$value*$dt;
+                $weights[$key]=($weights[$key]??0)+$dt;
+            }
+        }
+        if($b['t']-$anchor['t']<$window && $i<$n-1)continue;
+        $duration=$b['t']-$anchor['t'];$distance=$b['d']-$anchor['d'];
+        $pace=$distance>0 ? $duration*1000/$distance : null;
+        if(($weights['velocity_smooth']??0)>0){
+            $speed=$sums['velocity_smooth']/$weights['velocity_smooth'];
+            $pace=$speed>0?1000/$speed:null;
+        }
+        if(($weights['moving']??0)>0&&$sums['moving']===0.0)$pace=null;
+        $point=['km'=>round($b['d']/1000,3),'seconds'=>round($b['t']),
+            'pace'=>!$gap && $pace!==null && $pace>=120 && $pace<=1800 ? round($pace) : null,
+            'hr'=>!$gap && $hrSeconds>0 ? round($hrSum/$hrSeconds) : null];
+        foreach(['altitude','watts','cadence','grade_smooth','moving'] as $key){
+            $point[$key]=!$gap&&($weights[$key]??0)>0?round($sums[$key]/$weights[$key],2):null;
+        }
+        $result[]=$point;
+        $anchor=$b;$hrSum=0.0;$hrSeconds=0.0;$gap=false;$sums=[];$weights=[];
+    }
+    return $result;
 }
 function ll27MeanHrInRange(array $samples,float $from,float $to):?float {
     $values=[];foreach($samples as $s){if($s['d']>=$from && $s['d']<$to && $s['hr']!==null)$values[]=$s['hr'];}
