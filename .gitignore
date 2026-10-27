@@ -25,3 +25,4 @@ tmp/
 # Systemdateien
 .DS_Store
 Thumbs.db
+SUPPORTER_SETUP.md
