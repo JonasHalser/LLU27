@@ -37,8 +37,10 @@
    if(route.length<2){mapNode.style.height='auto';mapNode.textContent='Noch keine GPS-Strecke verfügbar. Bestehende Läufe werden schrittweise nachgeladen; Indoor-Läufe haben häufig keine GPS-Daten.';}
    else if(!window.L){mapNode.style.height='auto';mapNode.textContent='Kartenbibliothek konnte nicht geladen werden.';}
    else{
-    map=L.map(mapNode,{scrollWheelZoom:false,preferCanvas:true});
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+    map=L.map(mapNode,{scrollWheelZoom:true,preferCanvas:true});
+    const streets=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+    const satellite=L.tileLayer('https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles &copy; Esri &mdash; Sources: Esri, Maxar, Earthstar Geographics, and the GIS User Community'});
+    L.control.layers({'Straßenkarte':streets,'Satellit':satellite},null,{collapsed:false,position:'topright'}).addTo(map);
     map.fitBounds(L.latLngBounds(route.map(p=>p.latlng)),{padding:[22,22],maxZoom:16});
     const layer=L.layerGroup().addTo(map);
     const mode=document.getElementById('perf-map-mode');
