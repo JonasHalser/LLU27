@@ -127,3 +127,5 @@ Die Laufkarte nutzt Leaflet 1.9.4 und OpenStreetMap-Kartenkacheln mit Quellenhin
 ### Detail-Sync-Budget
 
 Der reguläre Sync verarbeitet standardmäßig bis zu fünf Detail-Läufe je Cronlauf, mit einem lokalen Budget von 30 pro Stunde und 180 pro UTC-Tag. Private .env-Optionen: PERFORMANCE_BATCH_SIZE (1–20, Standard 5), PERFORMANCE_MAX_PER_HOUR (1–200, Standard 30), PERFORMANCE_MAX_PER_DAY (1–1000, Standard 180). Bei leerer Warteschlange, ausgeschöpftem Budget oder einer aktiven HTTP-429-Pause endet die Verarbeitung vorzeitig. Der bestehende Sync-Lock verhindert parallele Cronläufe. Diese Werte sind lokale Abrufgrenzen; Stravas tatsächliche App-Limits gelten zusätzlich. Budgetzählung basiert weiterhin auf den gespeicherten Erfolgs-/Fehlerdatensätzen.
+
+Die Laufkarte unterstützt Mausrad-Zoom und einen Umschalter rechts oben zwischen OpenStreetMap-Straßenkarte und Esri World Imagery (Satellit). Beim Wechsel auf Satellit werden Kartenkacheln von services.arcgisonline.com geladen; auch dieser Anbieter sieht IP-Adresse und Kartenausschnitt. Strecke und Messwerte bleiben als lokale Kartenüberlagerung im Browser.
