@@ -21,6 +21,19 @@ require_once __DIR__ . '/performance.php';
 
 function ll27SyncPerformance(): array
 {
+    $messages=[];
+    $batch=max(1,min(20,(int)cfg('PERFORMANCE_BATCH_SIZE','5')));
+    for($i=0;$i<$batch;$i++){
+        $attempted=false;
+        $messages=array_merge($messages,ll27SyncPerformanceOne($attempted));
+        if(!$attempted)break;
+    }
+    return $messages;
+}
+
+function ll27SyncPerformanceOne(bool &$attempted): array
+{
+    $attempted=false;
     $pdo = db();
     $messages = [];
 
@@ -54,8 +67,8 @@ function ll27SyncPerformance(): array
      * konservativ. Der reguläre Strava-Sync
      * verursacht ebenfalls API-Anfragen.
      */
-    $maxPerDay = 30;
-    $maxPerHour = 2;
+    $maxPerDay = max(1,min(1000,(int)cfg('PERFORMANCE_MAX_PER_DAY','180')));
+    $maxPerHour = max(1,min(200,(int)cfg('PERFORMANCE_MAX_PER_HOUR','30')));
 
     $today = (int) $pdo->query(
         "SELECT COUNT(*)
@@ -158,7 +171,7 @@ function ll27SyncPerformance(): array
                 UTC_TIMESTAMP() - INTERVAL 7 DAY
 
             AND (p.activity_id IS NULL
-                OR COALESCE(JSON_EXTRACT(p.detail_json, '$.analysis_version'), 0) < 3)
+                OR COALESCE(JSON_EXTRACT(p.detail_json, '$.analysis_version'), 0) < 4)
 
             AND (
                 e.activity_id IS NULL
@@ -186,6 +199,7 @@ function ll27SyncPerformance(): array
 
     $activityId = (int) $candidate['id'];
     $userId = (int) $candidate['user_id'];
+    $attempted=true;
 
     /*
      * 5. Aktivitäts-Streams abrufen.
@@ -201,7 +215,7 @@ function ll27SyncPerformance(): array
             'GET',
             $url,
             [
-                'keys' => 'time,distance,heartrate,altitude,grade_smooth,watts,cadence,moving,velocity_smooth',
+                'keys' => 'time,distance,heartrate,latlng,altitude,grade_smooth,watts,cadence,moving,velocity_smooth',
                 'key_by_type' => 'true'
             ],
             $token

@@ -11,7 +11,7 @@ for($i=0;$i<=600;$i++){
     $stream['heartrate']['data'][]=150;
 }
 $metrics=ll27Performance($stream,190);
-verifyPerformance($metrics['analysis_version']===3,'Version for cache refresh');
+verifyPerformance($metrics['analysis_version']===4,'Version for cache refresh');
 verifyPerformance(count($metrics['timeline'])===20,'Thirty-second windows');
 verifyPerformance($metrics['timeline'][0]['pace']===333.0,'Pace in seconds per kilometre');
 verifyPerformance($metrics['timeline'][0]['hr']===150.0,'Time-weighted heart rate');
@@ -22,7 +22,7 @@ verifyPerformance($gap[0]['pace']===null&&$gap[0]['hr']===null,'Do not bridge me
 $missing=ll27Performance(['time'=>['data'=>[0,30]],'distance'=>['data'=>[0,90]]],190);
 verifyPerformance($missing['timeline'][0]['hr']===null,'Missing heart rate stays null');
 verifyPerformance($missing['timeline'][0]['pace']===333.0,'Pace without heart rate');
-verifyPerformance(ll27Performance([],190)['analysis_version']===3,'Empty streams do not retry forever');
+verifyPerformance(ll27Performance([],190)['analysis_version']===4,'Empty streams do not retry forever');
 $long=[];
 for($i=0;$i<=20000;$i++)$long[]=['t'=>$i,'d'=>$i*3,'hr'=>150];
 verifyPerformance(count(ll27Timeline($long))<=601,'Bounded payload for long runs');
@@ -42,4 +42,14 @@ $extra['watts']['data']=array_fill(0,601,0);
 verifyPerformance(ll27Performance($extra,190)['timeline'][0]['watts']===0.0,'Measured zero power retained');
 $extra['altitude']['data']=array_fill(0,601,99999);
 verifyPerformance(ll27Performance($extra,190)['timeline'][0]['altitude']===null,'Invalid altitude rejected');
+$gps=$stream;$gps['latlng']['data']=array_fill(0,601,[52.123456,13.123456]);
+$route=ll27Performance($gps,190)['route'];
+verifyPerformance(count($route)===601,'GPS route retained');
+verifyPerformance($route[0]['latlng']===[52.12346,13.12346],'GPS coordinates rounded');
+$gps['latlng']['data'][20]=null;
+$route=ll27Performance($gps,190)['route'];
+verifyPerformance($route[20]['break']===true,'Missing GPS breaks the route');
+$gps['latlng']['data']=array_fill(0,601,[999,13]);
+verifyPerformance(ll27Performance($gps,190)['route']===[],'Invalid GPS coordinates rejected');
+verifyPerformance($metrics['route']===[],'No invented route without GPS');
 echo "OK: performance analysis\n";
