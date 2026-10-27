@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded',()=>{
  const buttons=[...document.querySelectorAll('.runner-toggle[data-athlete]')];
  const selection=new Set(names);
  const teamCharts={};
- const makeSeries=type=>names.map(n=>series(n.toUpperCase(),team[type]?.[n]||[],palette[n],type==='distance'?{borderRadius:3}:{spanGaps:false}));
+ const makeSeries=type=>names.map(n=>series(n.toUpperCase(),team[type]?.[n]||[],palette[n],type==='distance'?{borderRadius:3}:{spanGaps:true}));
  function createTeamChart(id,type,kind,yLabel){
   const canvas=document.getElementById(id);
   if(!canvas)return;
