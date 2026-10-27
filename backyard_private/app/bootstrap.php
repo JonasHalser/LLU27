@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 const ROOT = __DIR__ . '/..';
+const TRAINING_START = '2026-10-01';
 function envload(): array { static $env=null; if ($env!==null) return $env; $env=[]; $path=ROOT.'/.env'; if (!is_file($path)) throw new RuntimeException('Konfiguration fehlt (.env).'); foreach(file($path, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) as $line){ $line=trim($line); if($line===''||str_starts_with($line,'#')) continue; $p=explode('=',$line,2); if(count($p)===2)$env[trim($p[0])]=trim($p[1]," \t\r\n\"'"); } return $env; }
 function cfg(string $key,string $default=''): string {return envload()[$key]??$default;}
 function db(): PDO {static $db=null;if($db)return $db;$db=new PDO('mysql:host='.cfg('DB_HOST','localhost').';port='.cfg('DB_PORT','3306').';dbname='.cfg('DB_NAME').';charset=utf8mb4',cfg('DB_USER'),cfg('DB_PASS'),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION,PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC,PDO::ATTR_EMULATE_PREPARES=>false]);return $db;}
@@ -11,7 +12,7 @@ function csrf():string{safeSession();return $_SESSION['csrf']??=bin2hex(random_b
 function verifyCsrf():void{if(!hash_equals(csrf(),(string)($_POST['csrf']??'')))throw new RuntimeException('Ungültige Formularanfrage.');}
 function h(mixed $v):string{return htmlspecialchars((string)$v,ENT_QUOTES|ENT_SUBSTITUTE,'UTF-8');}
 function redirect(string $to):never{header('Location: '.url($to),true,302);exit;}
-function currentUser():?array{safeSession();if(!isset($_SESSION['user_id']))restoreRememberedUser();if(!isset($_SESSION['user_id']))return null;$s=db()->prepare('SELECT id,username,display_name,start_date FROM users WHERE id=?');$s->execute([$_SESSION['user_id']]);return $s->fetch()?:null;}
+function currentUser():?array{safeSession();if(!isset($_SESSION['user_id']))restoreRememberedUser();if(!isset($_SESSION['user_id']))return null;$s=db()->prepare('SELECT id,username,display_name FROM users WHERE id=?');$s->execute([$_SESSION['user_id']]);$user=$s->fetch();if(!$user)return null;$user['start_date']=TRAINING_START;return $user;}
 function requireUser():array{$u=currentUser();if(!$u)redirect('index.php');return $u;}
 function isSupporterAdminRunner(int $userId):bool{$ids=array_filter(array_map('intval',explode(',',cfg('SUPPORTER_ADMIN_RUNNER_IDS'))));return $userId>0&&in_array($userId,$ids,true);}
 function cryptoKey():string{$raw=base64_decode(cfg('TOKEN_KEY'),true);if($raw===false||strlen($raw)!==32)throw new RuntimeException('TOKEN_KEY muss 32 Byte Base64 sein.');return $raw;}

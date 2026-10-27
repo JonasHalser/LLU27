@@ -36,7 +36,7 @@ function jokerDistanceTarget(float $average,string $type): float {
 }
 
 function jokerAverageDistance(int $runnerId): float {
-    $q=db()->prepare("SELECT AVG(GREATEST(a.distance_m,0)) FROM activities a JOIN users u ON u.id=a.user_id WHERE a.user_id=? AND a.activity_date>=CONCAT(u.start_date,' 00:00:00') AND TIMESTAMPADD(SECOND,GREATEST(a.moving_seconds,0),a.activity_date)<=UTC_TIMESTAMP() AND a.distance_m>0 AND a.cache_updated_at>=UTC_TIMESTAMP()-INTERVAL 7 DAY");
+    $q=db()->prepare("SELECT AVG(GREATEST(a.distance_m,0)) FROM activities a JOIN users u ON u.id=a.user_id WHERE a.user_id=? AND a.activity_date>='".TRAINING_START." 00:00:00' AND TIMESTAMPADD(SECOND,GREATEST(a.moving_seconds,0),a.activity_date)<=UTC_TIMESTAMP() AND a.distance_m>0 AND a.cache_updated_at>=UTC_TIMESTAMP()-INTERVAL 7 DAY");
     $q->execute([$runnerId]);$average=(float)$q->fetchColumn();
     if($average<=0)throw new RuntimeException('Für diesen Läufer sind noch keine synchronisierten Läufe für einen Durchschnitt verfügbar.');
     return round($average,2);

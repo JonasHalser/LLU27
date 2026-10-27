@@ -15,7 +15,7 @@ $monday = $now->modify('monday this week')->setTime(0, 0);
 $lastMonday = $monday->modify('-7 days');
 $previousEnd = $monday->modify('-1 second');
 
-$users = $pdo->query("SELECT id, username, start_date FROM users WHERE username IN ('tim','jonas','noah')")->fetchAll(PDO::FETCH_ASSOC);
+$users = $pdo->query("SELECT id, username FROM users WHERE username IN ('tim','jonas','noah')")->fetchAll(PDO::FETCH_ASSOC);
 if (!$users) { exit("Keine Teamkonten gefunden\n"); }
 
 // Sync prerequisite: the regular Strava import must have completed recently
@@ -44,7 +44,7 @@ foreach ([[$lastMonday, $monday], [$monday, $monday->modify('+7 days')]] as [$st
         $uid = (int)$u['id'];
         $existing->execute([$uid, $year, $week]);
         if ((int)$existing->fetchColumn() === 1) continue;
-        $select->execute([$uid, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $u['start_date'].' 00:00:00']);
+        $select->execute([$uid, $start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), TRAINING_START.' 00:00:00']);
         $loops = 0; $runs = 0;
         foreach ($select->fetchAll(PDO::FETCH_COLUMN) as $meters) {
             $runs++;

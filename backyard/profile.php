@@ -97,6 +97,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $success = 'Passwort geändert. Dauerhafte Anmeldungen wurden widerrufen.';
 
+        } elseif ($action === 'supporter_share') {
+            // Die optionale Supporter-Komponente verarbeitet ihre Freigabe selbst.
         } else {
             throw new RuntimeException('Ungültige Aktion.');
         }
@@ -445,6 +447,7 @@ $sharing = (int)$stmt->fetchColumn() === 1;
             </p>
 
         </section>
+        <?php require __DIR__.'/partials/supporter-runner.php'; ?>
     </main>
 
 </div>
