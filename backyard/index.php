@@ -13,8 +13,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
   $pass=(string)($_POST['password']??'');
   $q=db()->prepare('SELECT id,password_hash FROM users WHERE username=?');$q->execute([$name]);$account=$q->fetch();
   if(!$account||!password_verify($pass,$account['password_hash']))throw new RuntimeException('Benutzername oder Passwort falsch.');
-  session_regenerate_id(true);$_SESSION['user_id']=(int)$account['id'];
   if(isset($_POST['remember'])&&$_POST['remember']==='1')issueRememberToken((int)$account['id']);
+  else revokeRememberToken();
+  session_regenerate_id(true);$_SESSION['user_id']=(int)$account['id'];
   redirect('dashboard.php');
  }catch(Throwable $e){$error='Anmeldung fehlgeschlagen. Bitte Zugangsdaten und Datenbankkonfiguration prüfen.';}
 }
