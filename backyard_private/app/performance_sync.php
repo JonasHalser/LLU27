@@ -139,10 +139,12 @@ function ll27SyncPerformanceOne(bool &$attempted): array
      * - noch keine Performance-Analyse existiert
      * - keine aktive Fehlersperre besteht
      */
+    $defaultHrMax = max(120, min(220, (float)cfg('LLU27_HR_MAX', '190')));
     $sql = "
         SELECT
             a.id,
             a.user_id,
+            u.max_hr,
             a.activity_date,
             ath.access_token,
             ath.refresh_token,
@@ -153,6 +155,8 @@ function ll27SyncPerformanceOne(bool &$attempted): array
             ath.sync_error
 
         FROM activities a
+
+        INNER JOIN users u ON u.id = a.user_id
 
         INNER JOIN athletes ath
             ON ath.user_id = a.user_id
@@ -171,7 +175,8 @@ function ll27SyncPerformanceOne(bool &$attempted): array
                 UTC_TIMESTAMP() - INTERVAL 7 DAY
 
             AND (p.activity_id IS NULL
-                OR COALESCE(JSON_EXTRACT(p.detail_json, '$.analysis_version'), 0) < 4)
+                OR COALESCE(JSON_EXTRACT(p.detail_json, '$.analysis_version'), 0) < 4
+                OR COALESCE(JSON_EXTRACT(p.detail_json, '$.hr_max_reference'), 0) <> COALESCE(u.max_hr, $defaultHrMax))
 
             AND (
                 e.activity_id IS NULL
@@ -228,7 +233,7 @@ function ll27SyncPerformanceOne(bool &$attempted): array
             120.0,
             min(
                 220.0,
-                (float) cfg('LLU27_HR_MAX', '190')
+                (float) ($candidate['max_hr'] ?? cfg('LLU27_HR_MAX', '190'))
             )
         );
 

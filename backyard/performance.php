@@ -17,6 +17,11 @@ $byId=[];foreach($activities as $r)$byId[(string)$r['id']]=$r;
 $id=(string)($_GET['activity']??'');if(!isset($byId[$id]))$id=(string)($activities[0]['id']??'');
 $selected=$byId[$id]??null;
 $details=$selected && $selected['detail_json'] ? json_decode((string)$selected['detail_json'],true) : null;
+$hrQuery=db()->prepare('SELECT max_hr FROM users WHERE id=?');
+$hrQuery->execute([$uid]);
+$hrMax=max(120,min(220,(float)($hrQuery->fetchColumn() ?: cfg('LLU27_HR_MAX','190'))));
+$awaitingHrUpdate=$details && (float)($details['hr_max_reference']??0)!==$hrMax;
+if($awaitingHrUpdate)$details=null;
 $longest=null;$fastest=null;$maxKm=0.0;
 foreach($activities as $r){
  $km=(float)$r['distance_m']/1000;
@@ -37,6 +42,7 @@ function ll27Pace(int $seconds):string {return sprintf('%d:%02d',intdiv($seconds
 <?php require __DIR__ . "/partials/navigation.php"; ?>
 <div class="shell"><header class="top"><div class="brand"><img src="assets/llu27-icon.png" alt="LLU 27" width="44" height="44" style="border-radius:11px;vertical-align:middle;margin-right:8px">LLU <em>27</em> / PERFORMANCE</div><nav style="display:flex;gap:10px;flex-wrap:wrap"><a class="btn outline" href="dashboard.php">← Dashboard</a><a class="btn outline" href="profile.php">Mein Profil</a></nav></header>
 <div class="perf-head"><div><p class="eyebrow">LLU 27 · BACKYARD PERFORMANCE</p><h1>RUN SMARTER. <span>LAST LONGER.</span></h1><p class="muted">Laufeffizienz, HF-Zonen, Kilometer-Splits und persönliche Rekorde</p></div><span class="perf-pill">6,706 KM · ONE MORE LOOP</span></div>
+<?php if($awaitingHrUpdate): ?><p class="notice" role="status">Deine HFmax wurde geändert. Die Analyse dieses Laufs wird beim regulären Sync mit <?=h((string)$hrMax)?> bpm neu berechnet.</p><?php endif; ?>
 <section class="perf-grid"><article class="perf-card"><small>LÄNGSTER LAUF IM CACHE</small><strong><?= $longest?h(number_format($maxKm,1,',','.')).' km':'–' ?></strong><small><?= $longest?h($longest['name']):'Keine Läufe' ?></small></article><article class="perf-card"><small>SCHNELLSTE Ø PACE AB 1 KM</small><strong><?= $fastest? h(ll27Pace((int)round($fastest['pace']))).' min/km':'–' ?></strong><small>Nur erfasste Aktivitäten, nicht Bestzeiten je Distanz</small></article><article class="perf-card"><small>BACKYARD-RUNDENÄQUIVALENTE</small><strong><?=h(number_format(array_sum(array_map(static fn($a)=>(float)$a['distance_m'],$activities))/6706,1,',','.'))?></strong><small>Erfasste Distanz / 6,706 km</small></article></section>
 <section class="panel" style="margin-bottom:18px"><h2>Aktivität analysieren</h2><p class="muted">Wähle einen deiner Läufe mit erfasster Ø-Herzfrequenz. Detaildaten werden im Cronjob schrittweise geladen.</p>
 <form method="get"><select class="perf-select" name="activity" onchange="this.form.submit()"><option value="">Lauf auswählen</option><?php foreach($activities as $r):?><option value="<?=h($r['id'])?>" <?= $id===(string)$r['id']?'selected':'' ?>><?=h(date('d.m.Y',strtotime($r['activity_date'])).' · '.$r['name'].' · '.number_format((float)$r['distance_m']/1000,1,',','.').' km')?></option><?php endforeach;?></select><noscript><button class="btn">Anzeigen</button></noscript></form></section>

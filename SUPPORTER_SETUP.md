@@ -20,6 +20,10 @@ Supporter bekommen bei der Registrierung einmalig 100 LLU Coins und für den ers
 
 Im Wettportal sehen eingeloggte Supporter die Einsätze und Poolanteile der anderen in einer Grafik, die alle 15 Sekunden aktualisiert wird. Supporter können außerdem automatische Laufziel-Pools eröffnen, zum Beispiel „Tim läuft bis Freitag mindestens 100 km“. Dafür muss der Läufer seine Supporter-Laufdaten freigegeben haben. Ziele werden nach Kilometern oder vollständigen Loops ausgewertet, laufen höchstens sieben Tage und werden bei Widerruf der Freigabe abgebrochen; Einsätze werden dann zurückgezahlt. Die Migration `20261026_supporter_custom_bets.sql` speichert dafür nur die nötigen Aktivitätssummen bis zur Auswertung, auch wenn der normale Aktivitäts-Cache abläuft.
 
+Im Läuferprofil lässt sich die HFmax (120–220 bpm) für die Performance-Zonen einstellen. Ohne persönlichen Wert gilt weiterhin LLU27_HR_MAX (Standard 190 bpm). Bestehende Analysen werden nach Änderungen über den regulären Performance-Sync innerhalb seines Abrufbudgets neu berechnet.
+
+Vor dem Übertragen dieser Änderung die wiederholbare Migration 20261110_personal_max_hr.sql ausführen. Im SQL-Migrationsworkflow dafür sql_files: 20261110_personal_max_hr.sql und confirmation: APPLY verwenden.
+
 ## Hostinger vorbereiten (manuell; kein Deployment wurde ausgeführt)
 
 1. Datenbank sichern. Auf Hostinger PHP **8.2 oder neuer** mit PDO MySQL, mbstring, curl und OpenSSL aktivieren. HTTPS ist erforderlich; Cookies sind ausschließlich `Secure`.
