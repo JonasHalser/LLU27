@@ -35,6 +35,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ? 'Deine Herzfrequenz ist jetzt für den Teamvergleich freigegeben.'
                 : 'Deine Herzfrequenz wird nicht mehr im Teamvergleich geteilt.';
 
+        } elseif ($action === 'max_hr') {
+            $maxHr = filter_var($_POST['max_hr'] ?? '', FILTER_VALIDATE_INT, ['options' => ['min_range' => 120, 'max_range' => 220]]);
+            if ($maxHr === false) {
+                throw new RuntimeException('Bitte eine maximale Herzfrequenz zwischen 120 und 220 bpm eingeben.');
+            }
+            $stmt = db()->prepare('UPDATE users SET max_hr = ? WHERE id = ?');
+            $stmt->execute([$maxHr, (int)$u['id']]);
+            $success = 'HFmax gespeichert. Bestehende Analysen werden beim regulären Sync neu berechnet.';
+
         } elseif ($action === 'password') {
             $old = (string)($_POST['old_password'] ?? '');
             $new = (string)($_POST['new_password'] ?? '');
@@ -109,11 +118,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $stmt = db()->prepare(
-    'SELECT share_team_hr FROM users WHERE id = ?'
+    'SELECT share_team_hr, max_hr FROM users WHERE id = ?'
 );
 $stmt->execute([(int)$u['id']]);
 
-$sharing = (int)$stmt->fetchColumn() === 1;
+$profile = $stmt->fetch();
+$sharing = (int)$profile['share_team_hr'] === 1;
+$maxHr = $profile['max_hr'] ?? max(120, min(220, (float)cfg('LLU27_HR_MAX', '190')));
 ?>
 
 <!DOCTYPE html>
@@ -326,6 +337,16 @@ $sharing = (int)$stmt->fetchColumn() === 1;
                     <?= h($success) ?>
                 </p>
             <?php endif; ?>
+
+            <h2 class="section-title">Maximale Herzfrequenz</h2>
+            <p class="muted">Deine HFmax bestimmt die Herzfrequenzzonen und die HF-Farben deiner Performance-Analyse.</p>
+            <form method="post" class="password-form">
+                <input type="hidden" name="csrf" value="<?= h(csrf()) ?>">
+                <input type="hidden" name="action" value="max_hr">
+                <label for="max-hr">Maximale Herzfrequenz (bpm)</label>
+                <input id="max-hr" name="max_hr" type="number" min="120" max="220" step="1" required value="<?= h((string)$maxHr) ?>">
+                <button class="btn" type="submit">HFmax speichern</button>
+            </form>
 
             <section class="sharing-card">
                 <p class="eyebrow">LLU 27 · TEAMFREIGABE</p>
